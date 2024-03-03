@@ -4,6 +4,7 @@
 #ifndef PIC_IL_H_
 #define PIC_IL_H_
 
+#include <rz_analysis.h>
 #include <rz_il.h>
 
 /**

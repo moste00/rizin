@@ -98,7 +98,7 @@ typedef enum pic_midrange_reg_type_t {
     REG_RESERVED,
     REG_FREG, /* normal indexed file register */
     REG_UNIMPLEMENTED, /* unimplemented registers are read as 0 */
-    REG_NUM /* can be used when a function fails and want to return an invalid value */
+    REG_INVALID /* can be used when a function fails and want to return an invalid value */
 } PicMidrangeRegType;
 
 /**
@@ -188,7 +188,13 @@ const char* pic_midrange_il_regnames[REG_UNIMPLEMENTED + 1] = {
     [REG_FREG]          = "REG_FREG",
     [REG_UNIMPLEMENTED] = "REG_UNIMPLEMENTED",
 };
-
 // clang-format on
+
+static inline const char *pic_midrange_regname(ut32 reg) {
+	if (reg >= RZ_ARRAY_SIZE(pic_midrange_il_regnames)) {
+		return NULL;
+	}
+	return pic_midrange_il_regnames[reg];
+}
 
 #endif // RZ_PIC_MIDRANGE_PIC_REGTYPES_H

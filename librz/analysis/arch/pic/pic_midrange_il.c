@@ -2,21 +2,23 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 #include <string.h>
-#include <cstdlib.h>
+#include <stdlib.h>
 
 #include "pic_il.h"
-#include "../../../arm/arch/pic/pic_midrange.h"
+#include "../../asm/arch/pic/pic_midrange.h"
 
 #include <rz_il/rz_il_opbuilder_begin.h>
 
 // HELPER DEFINES & TYPEDEFS
 
-typedef RzILOpEffect *(PicILUplifter)(ut16 instr);
-#define IL_LIFTER(op) pic_midrange_##op_il_lifter(RZ_NONNULL PicMidrangeCPUState *cpu_state, ut16 instr)
+typedef RzILOpEffect *(*FN_PicILUplifter)(PicMidrangeCPUState *, ut16);
+#define IL_LIFTER(op)      pic_midrange_##op##_il_lifter
+#define IL_LIFTER_IMPL(op) static RzILOpEffect *pic_midrange_##op##_il_lifter( \
+	RZ_NONNULL PicMidrangeCPUState *cpu_state, ut16 instr)
 
 // REGISTER DECLARATIONS & DEFINITIONS
 #include "pic16f_memmaps/memmaps.h"
-#define GET_REG_NAME(reg_type) GET_REG_NAME(reg_type)
+#define GET_REG_NAME(reg_type) pic_midrange_regname(reg_type)
 #define GET_WREG()             VARG("WREG")
 #define GET_FREG(idx)          VARG("FREG" #idx)
 // idx is kept with name in order to differentiate between same registers of different banks
@@ -41,27 +43,27 @@ const char *pic_midrange_status_flags[] = {
 #define STATUS(x) pic_midrange_status_flags[x]
 
 // device to register schema map
-const char **pic_midrange_device_reg_map[] = {
+PicMidrangeRegType *pic_midrange_device_reg_map[] = {
 	[PIC16F882] = pic16f882_reg_map,
 	[PIC16F883] = pic16f883_reg_map,
-	[PIC16F884] = pic16f884_reg_map,
+	//	[PIC16F884] = pic16f884_reg_map,
 	[PIC16F886] = pic16f886_reg_map,
-	[PIC16F887] = pic16f887_reg_map,
+	//	[PIC16F887] = pic16f887_reg_map,
 };
 
 /**
  * Get PicMidrangeRegType corresponding to give register index
  *
  * \param cpu_state Device CPU state.
- * \param regidx Register index inside given bank of given device type.
+ * \param reg Register index inside given bank of given device type.
  *
  * \return PicMidrangeRegType
  * */
-PicMidrangeRegType pic_midrange_il_get_reg_type(RZ_NONNULL PicMidrangeCPUState *cpu_state, ut8 regidx) {
+PicMidrangeRegType pic_midrange_il_get_reg_type(RZ_NONNULL PicMidrangeCPUState *cpu_state, ut8 reg) {
 	rz_return_val_if_fail(cpu_state, REG_INVALID);
 
 	// compute linear register address
-	ut32 addr = cpu_state->selected_bank * BANK_SIZE + regidx;
+	ut32 addr = cpu_state->selected_bank * BANK_SIZE + reg;
 	return pic_midrange_device_reg_map[cpu_state->device_type][addr];
 }
 
@@ -78,7 +80,7 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
 
 	// compute linear address
 	ut32 addr = cpu_state->selected_bank * BANK_SIZE + regidx;
-	PicMidrangeRegType reg_type = pic_midrange_device_reg_map[device_type][addr];
+	PicMidrangeRegType reg_type = pic_midrange_device_reg_map[cpu_state->device_type][addr];
 
 	// return register for given type
 	if (reg_type == REG_FREG) {
@@ -88,7 +90,7 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
 		}
 		return GET_FREG(addr);
 	} else if (reg_type == REG_UNIMPLEMENTED || reg_type == REG_RESERVED) {
-		return GET_SPREG(GET_REG_NAME(reg_type))
+		return GET_SPREG(GET_REG_NAME(reg_type), cpu_state->selected_bank);
 	} else {
 		// for other special registers we need to append their bank index at the end
 		// in order to avoid confusions
@@ -97,8 +99,8 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
 		// # of banks will also be supported.
 		size_t regnamesz = strlen(GET_REG_NAME(reg_type)) + 4;
 		const char *regname = malloc(regnamesz);
-		memset(regname, 0, regnamesz)
-			strcpy(regname, GET_REG_NAME(reg_type));
+		memset(regname, 0, regnamesz);
+		strcpy(regname, GET_REG_NAME(reg_type));
 		char *bankstr = rz_num_as_string(NULL, cpu_state->selected_bank, true);
 		if (!bankstr) {
 			RZ_LOG_ERROR("RzIL : FAILED TO CONVERT NUMBER TO STRING");
@@ -109,7 +111,7 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
 	}
 }
 
-// use only in IL_LIFTER functions
+// use only in IL_LIFTER_IMPL functions
 #define GET_REG_TYPE(idx) pic_midrange_il_get_reg_type(cpu_state, idx)
 #define GET_REG(idx)      pic_midrange_il_get_reg(cpu_state, idx);
 
@@ -126,12 +128,15 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
 		} \
 	} while (0)
 
+#define BITN(x, n) IS_ZERO(LOGAND(SHIFTR0(x, U32(n)), U32(1)))
 // overflow is not used in status register but just keeping this for future "maybe" use
 #define CHECK_OVERFLOW(x, y, res)     AND(XOR(MSB(x), MSB(res)), XOR(MSB(y), MSB(res)))
 #define CHECK_CARRY(x, y, res)        OR(AND(MSB(x), MSB(y)), AND(OR(MSB(x), MSB(y)), INV(MSB(res))))
 #define CHECK_BORROW(x, y, res)       OR(OR(AND(INV(MSB(x)), MSB(y)), AND(INV(MSB(x)), MSB(res))), AND(MSB(x), AND(MSB(y), MSB(res))))
 #define CHECK_DIGIT_CARRY(x, y, res)  OR(AND(BITN(x, 3), BITN(y, 3)), AND(OR(BITN(x, 3), BITN(y, 3)), INV(BITN(res, 3))))
-#define CHECK_DIGIT_BORROW(x, y, res) OR(OR(AND(INV(BITN(x, 3)), BITN(y, 3)), AND(INV(BITN(x, 3)), BITN(res, 3))), AND(BITN(x, 3), AND(BITN(y, 3), BITN(res, 3))))
+#define CHECK_DIGIT_BORROW(x, y, res) OR( \
+	OR(AND(INV(BITN(x, 3)), BITN(y, 3)), AND(INV(BITN(x, 3)), BITN(res, 3))), \
+	AND(BITN(x, 3), AND(BITN(y, 3), BITN(res, 3))))
 
 /**
  * Handle C, DC & Z flags for the previous operation.
@@ -169,83 +174,24 @@ RzILOpEffect *pic_midrange_il_set_arithmetic_flags(RZ_BORROW RzILOpPure *x, RZ_B
 #define SET_STATUS_ADD(x, y, r) pic_midrange_il_set_arithmetic_flags(x, y, r, true)
 #define SET_STATUS_SUB(x, y, r) pic_midrange_il_set_arithmetic_flags(x, y, r, false)
 
-// INSTRUCTIONS LOOKUP-TABLE
-// clang-format off
-PicILUplifter pic_midrange_il_uplifters[] = {
-    [PIC_MIDRANGE_OPCODE_NOP]             = IL_LIFTER(NOP),
-    [PIC_MIDRANGE_OPCODE_RETURN]          = IL_LIFTER(RETURN),
-    [PIC_MIDRANGE_OPCODE_RETFIE]          = IL_LIFTER(RETFIE),
-    [PIC_MIDRANGE_OPCODE_OPTION]          = IL_LIFTER(OPTION),
-    [PIC_MIDRANGE_OPCODE_SLEEP]           = IL_LIFTER(SLEEP),
-    [PIC_MIDRANGE_OPCODE_CLRWDT]          = IL_LIFTER(CLRWDT),
-    [PIC_MIDRANGE_OPCODE_TRIS]            = IL_LIFTER(TRIS),
-    [PIC_MIDRANGE_OPCODE_MOVWF]           = IL_LIFTER(MOVWF),
-    [PIC_MIDRANGE_OPCODE_CLR]             = IL_LIFTER(CLR),
-    [PIC_MIDRANGE_OPCODE_SUBWF]           = IL_LIFTER(SUBWF),
-    [PIC_MIDRANGE_OPCODE_DECF]            = IL_LIFTER(DECF),
-    [PIC_MIDRANGE_OPCODE_IORWF]           = IL_LIFTER(IORWF),
-    [PIC_MIDRANGE_OPCODE_ANDWF]           = IL_LIFTER(ANDWF),
-    [PIC_MIDRANGE_OPCODE_XORWF]           = IL_LIFTER(XORWF),
-    [PIC_MIDRANGE_OPCODE_ADDWF]           = IL_LIFTER(ADDWF),
-    [PIC_MIDRANGE_OPCODE_MOVF]            = IL_LIFTER(MOVF),
-    [PIC_MIDRANGE_OPCODE_COMF]            = IL_LIFTER(COMF),
-    [PIC_MIDRANGE_OPCODE_INCF]            = IL_LIFTER(INCF),
-    [PIC_MIDRANGE_OPCODE_DECFSZ]          = IL_LIFTER(DECFSZ),
-    [PIC_MIDRANGE_OPCODE_RRF]             = IL_LIFTER(RRF),
-    [PIC_MIDRANGE_OPCODE_RLF]             = IL_LIFTER(RLF),
-    [PIC_MIDRANGE_OPCODE_SWAPF]           = IL_LIFTER(SWAPF),
-    [PIC_MIDRANGE_OPCODE_INCFSZ]          = IL_LIFTER(INCFSZ),
-    [PIC_MIDRANGE_OPCODE_BCF]             = IL_LIFTER(BCF),
-    [PIC_MIDRANGE_OPCODE_BSF]             = IL_LIFTER(BSF),
-    [PIC_MIDRANGE_OPCODE_BTFSC]           = IL_LIFTER(BTFSC),
-    [PIC_MIDRANGE_OPCODE_BTFSS]           = IL_LIFTER(BTFSS),
-    [PIC_MIDRANGE_OPCODE_CALL]            = IL_LIFTER(CALL),
-    [PIC_MIDRANGE_OPCODE_GOTO]            = IL_LIFTER(GOTO),
-    [PIC_MIDRANGE_OPCODE_MOVLW]           = IL_LIFTER(MOVLW),
-    [PIC_MIDRANGE_OPCODE_RETLW]           = IL_LIFTER(RETLW),
-    [PIC_MIDRANGE_OPCODE_IORLW]           = IL_LIFTER(IORLW),
-    [PIC_MIDRANGE_OPCODE_ANDLW]           = IL_LIFTER(ANDLW),
-    [PIC_MIDRANGE_OPCODE_XORLW]           = IL_LIFTER(XORLW),
-    [PIC_MIDRANGE_OPCODE_SUBLW]           = IL_LIFTER(SUBLW),
-    [PIC_MIDRANGE_OPCODE_ADDLW]           = IL_LIFTER(ADDLW),
-    [PIC_MIDRANGE_OPCODE_RESET]           = IL_LIFTER(RESET),
-    [PIC_MIDRANGE_OPCODE_CALLW]           = IL_LIFTER(CALLW),
-    [PIC_MIDRANGE_OPCODE_BRW]             = IL_LIFTER(BRW),
-    [PIC_MIDRANGE_OPCODE_MOVIW_1]         = IL_LIFTER(MOVIW_1),
-    [PIC_MIDRANGE_OPCODE_MOVWI_1]         = IL_LIFTER(MOVWI_1),
-    [PIC_MIDRANGE_OPCODE_MOVLB]           = IL_LIFTER(MOVLB),
-    [PIC_MIDRANGE_OPCODE_LSLF]            = IL_LIFTER(LSLF),
-    [PIC_MIDRANGE_OPCODE_LSRF]            = IL_LIFTER(LSRF),
-    [PIC_MIDRANGE_OPCODE_ASRF]            = IL_LIFTER(ASRF),
-    [PIC_MIDRANGE_OPCODE_SUBWFB]          = IL_LIFTER(SUBWFB),
-    [PIC_MIDRANGE_OPCODE_ADDWFC]          = IL_LIFTER(ADDWFC),
-    [PIC_MIDRANGE_OPCODE_ADDFSR]          = IL_LIFTER(ADDFSR),
-    [PIC_MIDRANGE_OPCODE_MOVLP]           = IL_LIFTER(MOVLP),
-    [PIC_MIDRANGE_OPCODE_BRA]             = IL_LIFTER(BRA),
-    [PIC_MIDRANGE_OPCODE_MOVIW_2]         = IL_LIFTER(MOVIW_2),
-    [PIC_MIDRANGE_OPCODE_MOVWI_2]         = IL_LIFTER(MOVWI_2),
-    [PIC_MIDRANGE_OPCODE_INVALID]         = NULL
-};
-// clang-format on
-
 /**
  * NOP
  * Operation: No Operation.
  * Operands: NONE
  * Status affected : NONE
  * */
-IL_LIFTER(NOP) {
-	NOP();
+IL_LIFTER_IMPL(NOP) {
+	return NOP();
 }
 
-IL_LIFTER(RETURN) {}
-IL_LIFTER(RETFIE) {}
-IL_LIFTER(OPTION) {}
-IL_LIFTER(SLEEP) {}
-IL_LIFTER(CLRWDT) {}
-IL_LIFTER(TRIS) {}
-IL_LIFTER(MOVWF) {}
-IL_LIFTER(CLR) {}
+IL_LIFTER_IMPL(RETURN) {}
+IL_LIFTER_IMPL(RETFIE) {}
+IL_LIFTER_IMPL(OPTION) {}
+IL_LIFTER_IMPL(SLEEP) {}
+IL_LIFTER_IMPL(CLRWDT) {}
+IL_LIFTER_IMPL(TRIS) {}
+IL_LIFTER_IMPL(MOVWF) {}
+IL_LIFTER_IMPL(CLR) {}
 
 /**
  * SUBWF
@@ -253,13 +199,14 @@ IL_LIFTER(CLR) {}
  * Operands: f, d
  * Status affected : C, DC, Z
  * */
-IL_LIFTER(SUBWF) {
+IL_LIFTER_IMPL(SUBWF) {
 	GET_REG_7F(freg);
 	RzILOpPure *wreg = GET_WREG();
 
 	// if d bit is enabled then result will go in freg else wreg
-	bool reg_dest = PIC_MIDRANGE_OP_PARGS_7F_GET_D(instr);
-	RzILOpPure *dest = reg_dest : freg ? wreg;
+	// TODO:
+	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
+	RzILOpPure *dest = reg_dest ? freg : wreg;
 
 	// create a copy of current value of wreg because it's going to change
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
@@ -268,8 +215,8 @@ IL_LIFTER(SUBWF) {
 	return SEQ3(wreg_old, sub_op, set_status_op);
 }
 
-IL_LIFTER(DECF) {}
-IL_LIFTER(IORWF) {}
+IL_LIFTER_IMPL(DECF) {}
+IL_LIFTER_IMPL(IORWF) {}
 
 /**
  * ANDWF
@@ -277,12 +224,13 @@ IL_LIFTER(IORWF) {}
  * Operands: f, d
  * Status affected : Z
  * */
-IL_LIFTER(ANDWF) {
+IL_LIFTER_IMPL(ANDWF) {
 	GET_REG_7F(freg);
 
 	// if d bit is enabled then result will go in freg else wreg
-	bool reg_dest = PIC_MIDRANGE_OP_PARGS_7F_GET_D(instr);
-	RzILOpPure *dest = reg_dest : freg ? GET_WREG();
+	// TODO:
+	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
+	RzILOpPure *dest = reg_dest ? freg : GET_WREG();
 
 	// create a copy of current value of wreg because it's going to change
 	RzILOpEffect *and_op = SETG(dest, LOGAND(GET_WREG(), freg));
@@ -296,13 +244,14 @@ IL_LIFTER(ANDWF) {
  * Operands: f, d
  * Status affected : Z
  * */
-IL_LIFTER(XORWF) {
+IL_LIFTER_IMPL(XORWF) {
 	GET_REG_7F(freg);
 	RzILOpPure *wreg = GET_WREG();
 
 	// if d bit is enabled then result will go in freg else wreg
-	bool reg_dest = PIC_MIDRANGE_OP_PARGS_7F_GET_D(instr);
-	RzILOpPure *dest = reg_dest : freg ? wreg;
+	// TODO:
+	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
+	RzILOpPure *dest = reg_dest ? freg : wreg;
 
 	// create a copy of current value of wreg because it's going to change
 	RzILOpEffect *and_op = SETG(dest, LOGAND(wreg, freg));
@@ -316,13 +265,14 @@ IL_LIFTER(XORWF) {
  * Operands: f, d
  * Status affected : C, DC, Z
  * */
-IL_LIFTER(ADDWF) {
+IL_LIFTER_IMPL(ADDWF) {
 	GET_REG_7F(freg);
 	RzILOpPure *wreg = GET_WREG();
 
 	// if d bit is enabled then result will go in freg else wreg
-	bool reg_dest = PIC_MIDRANGE_OP_PARGS_7F_GET_D(instr);
-	RzILOpPure *dest = reg_dest : freg ? wreg;
+	// TODO:
+	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
+	RzILOpPure *dest = reg_dest ? freg : wreg;
 
 	// create a copy of current value of wreg because it's going to change
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
@@ -331,35 +281,33 @@ IL_LIFTER(ADDWF) {
 	return SEQ3(wreg_old, add_op, set_status_op);
 }
 
-IL_LIFTER(MOVF) {}
-IL_LIFTER(COMF) {}
-IL_LIFTER(INCF) {}
-IL_LIFTER(DECFSZ) {}
-IL_LIFTER(RRF) {}
-IL_LIFTER(RLF) {}
-IL_LIFTER(SWAPF) {}
-IL_LIFTER(INCFSZ) {}
-IL_LIFTER(BCF) {}
-IL_LIFTER(BSF) {}
-IL_LIFTER(BTFSC) {}
-IL_LIFTER(BTFSS) {}
-IL_LIFTER(CALL) {}
-IL_LIFTER(GOTO) {}
-IL_LIFTER(MOVLW) {}
-IL_LIFTER(RETLW) {}
+IL_LIFTER_IMPL(MOVF) {}
+IL_LIFTER_IMPL(COMF) {}
+IL_LIFTER_IMPL(INCF) {}
+IL_LIFTER_IMPL(DECFSZ) {}
+IL_LIFTER_IMPL(RRF) {}
+IL_LIFTER_IMPL(RLF) {}
+IL_LIFTER_IMPL(SWAPF) {}
+IL_LIFTER_IMPL(INCFSZ) {}
+IL_LIFTER_IMPL(BCF) {}
+IL_LIFTER_IMPL(BSF) {}
+IL_LIFTER_IMPL(BTFSC) {}
+IL_LIFTER_IMPL(BTFSS) {}
+IL_LIFTER_IMPL(CALL) {}
+IL_LIFTER_IMPL(GOTO) {}
+IL_LIFTER_IMPL(MOVLW) {}
+IL_LIFTER_IMPL(RETLW) {}
 
-IL_LIFTER(IORLW) {}
+IL_LIFTER_IMPL(IORLW) {}
 
-/**
- * ANDLW.
- * Operation: Take logical AND between literal and WREG
- * Operands: Literal (k)
- * Status affected : Z
- * */
-IL_LIFTER(ANDLW) {
+static RzILOpEffect *SET(const char *flag, RzILOpBool *pPure) {
+	return SETG(flag, pPure);
+}
+
+IL_LIFTER_IMPL(ANDLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *and_op = SETG(wreg, LOGAND(wreg, U8(literal)));
+	RzILOpEffect *and_op = SETG("WREG", LOGAND(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
 	return SEQ2(and_op, set_status_op);
 }
@@ -370,10 +318,10 @@ IL_LIFTER(ANDLW) {
  * Operands: Literal (k)
  * Status affected : Z
  * */
-IL_LIFTER(XORLW) {
+IL_LIFTER_IMPL(XORLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *xor_op = SETG(wreg, LOGXOR(wreg, U8(literal)));
+	RzILOpEffect *xor_op = SETG("WREG", LOGXOR(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
 	return SEQ2(xor_op, set_status_op);
 }
@@ -384,11 +332,11 @@ IL_LIFTER(XORLW) {
  * Operands: Literal (k)
  * Status affected : C, DC, Z
  * */
-IL_LIFTER(SUBLW) {
+IL_LIFTER_IMPL(SUBLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *sub_op = SETG(wreg, SUB(wreg, U8(literal)));
+	RzILOpEffect *sub_op = SETG("WREG", SUB(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), U8(literal), wreg);
 	return SEQ3(wreg_old, sub_op, set_status_op);
 }
@@ -399,32 +347,88 @@ IL_LIFTER(SUBLW) {
  * Operands: Literal (k)
  * Status affected : C, DC, Z
  * */
-IL_LIFTER(ADDLW) {
+IL_LIFTER_IMPL(ADDLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *add_op = SETG(wreg, ADD(wreg, U8(literal)));
+	RzILOpEffect *add_op = SETG("WREG", ADD(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_ADD(VARL("wreg_old"), U8(literal), wreg);
 	return SEQ3(wreg_old, add_op, set_status_op);
 }
 
-IL_LIFTER(RESET) {}
-IL_LIFTER(CALLW) {}
-IL_LIFTER(BRW) {}
-IL_LIFTER(MOVIW_1) {}
-IL_LIFTER(MOVWI_1) {}
-IL_LIFTER(MOVLB) {}
-IL_LIFTER(LSLF) {}
-IL_LIFTER(LSRF) {}
-IL_LIFTER(ASRF) {}
-IL_LIFTER(SUBWFB) {}
-IL_LIFTER(ADDWFC) {}
-IL_LIFTER(ADDFSR) {}
-IL_LIFTER(MOVLP) {}
-IL_LIFTER(BRA) {}
-IL_LIFTER(MOVIW_2) {}
-IL_LIFTER(MOVWI_2) {}
-IL_LIFTER(INVALID) {}
+IL_LIFTER_IMPL(RESET) {}
+IL_LIFTER_IMPL(CALLW) {}
+IL_LIFTER_IMPL(BRW) {}
+IL_LIFTER_IMPL(MOVIW_1) {}
+IL_LIFTER_IMPL(MOVWI_1) {}
+IL_LIFTER_IMPL(MOVLB) {}
+IL_LIFTER_IMPL(LSLF) {}
+IL_LIFTER_IMPL(LSRF) {}
+IL_LIFTER_IMPL(ASRF) {}
+IL_LIFTER_IMPL(SUBWFB) {}
+IL_LIFTER_IMPL(ADDWFC) {}
+IL_LIFTER_IMPL(ADDFSR) {}
+IL_LIFTER_IMPL(MOVLP) {}
+IL_LIFTER_IMPL(BRA) {}
+IL_LIFTER_IMPL(MOVIW_2) {}
+IL_LIFTER_IMPL(MOVWI_2) {}
+
+// INSTRUCTIONS LOOKUP-TABLE
+static const FN_PicILUplifter pic_midrange_il_uplifters[] = {
+	[PIC_MIDRANGE_OPCODE_NOP] = IL_LIFTER(NOP),
+	[PIC_MIDRANGE_OPCODE_RETURN] = IL_LIFTER(RETURN),
+	[PIC_MIDRANGE_OPCODE_RETFIE] = IL_LIFTER(RETFIE),
+	[PIC_MIDRANGE_OPCODE_OPTION] = IL_LIFTER(OPTION),
+	[PIC_MIDRANGE_OPCODE_SLEEP] = IL_LIFTER(SLEEP),
+	[PIC_MIDRANGE_OPCODE_CLRWDT] = IL_LIFTER(CLRWDT),
+	[PIC_MIDRANGE_OPCODE_TRIS] = IL_LIFTER(TRIS),
+	[PIC_MIDRANGE_OPCODE_MOVWF] = IL_LIFTER(MOVWF),
+	[PIC_MIDRANGE_OPCODE_CLR] = IL_LIFTER(CLR),
+	[PIC_MIDRANGE_OPCODE_SUBWF] = IL_LIFTER(SUBWF),
+	[PIC_MIDRANGE_OPCODE_DECF] = IL_LIFTER(DECF),
+	[PIC_MIDRANGE_OPCODE_IORWF] = IL_LIFTER(IORWF),
+	[PIC_MIDRANGE_OPCODE_ANDWF] = IL_LIFTER(ANDWF),
+	[PIC_MIDRANGE_OPCODE_XORWF] = IL_LIFTER(XORWF),
+	[PIC_MIDRANGE_OPCODE_ADDWF] = IL_LIFTER(ADDWF),
+	[PIC_MIDRANGE_OPCODE_MOVF] = IL_LIFTER(MOVF),
+	[PIC_MIDRANGE_OPCODE_COMF] = IL_LIFTER(COMF),
+	[PIC_MIDRANGE_OPCODE_INCF] = IL_LIFTER(INCF),
+	[PIC_MIDRANGE_OPCODE_DECFSZ] = IL_LIFTER(DECFSZ),
+	[PIC_MIDRANGE_OPCODE_RRF] = IL_LIFTER(RRF),
+	[PIC_MIDRANGE_OPCODE_RLF] = IL_LIFTER(RLF),
+	[PIC_MIDRANGE_OPCODE_SWAPF] = IL_LIFTER(SWAPF),
+	[PIC_MIDRANGE_OPCODE_INCFSZ] = IL_LIFTER(INCFSZ),
+	[PIC_MIDRANGE_OPCODE_BCF] = IL_LIFTER(BCF),
+	[PIC_MIDRANGE_OPCODE_BSF] = IL_LIFTER(BSF),
+	[PIC_MIDRANGE_OPCODE_BTFSC] = IL_LIFTER(BTFSC),
+	[PIC_MIDRANGE_OPCODE_BTFSS] = IL_LIFTER(BTFSS),
+	[PIC_MIDRANGE_OPCODE_CALL] = IL_LIFTER(CALL),
+	[PIC_MIDRANGE_OPCODE_GOTO] = IL_LIFTER(GOTO),
+	[PIC_MIDRANGE_OPCODE_MOVLW] = IL_LIFTER(MOVLW),
+	[PIC_MIDRANGE_OPCODE_RETLW] = IL_LIFTER(RETLW),
+	[PIC_MIDRANGE_OPCODE_IORLW] = IL_LIFTER(IORLW),
+	[PIC_MIDRANGE_OPCODE_ANDLW] = IL_LIFTER(ANDLW),
+	[PIC_MIDRANGE_OPCODE_XORLW] = IL_LIFTER(XORLW),
+	[PIC_MIDRANGE_OPCODE_SUBLW] = IL_LIFTER(SUBLW),
+	[PIC_MIDRANGE_OPCODE_ADDLW] = IL_LIFTER(ADDLW),
+	[PIC_MIDRANGE_OPCODE_RESET] = IL_LIFTER(RESET),
+	[PIC_MIDRANGE_OPCODE_CALLW] = IL_LIFTER(CALLW),
+	[PIC_MIDRANGE_OPCODE_BRW] = IL_LIFTER(BRW),
+	[PIC_MIDRANGE_OPCODE_MOVIW_1] = IL_LIFTER(MOVIW_1),
+	[PIC_MIDRANGE_OPCODE_MOVWI_1] = IL_LIFTER(MOVWI_1),
+	[PIC_MIDRANGE_OPCODE_MOVLB] = IL_LIFTER(MOVLB),
+	[PIC_MIDRANGE_OPCODE_LSLF] = IL_LIFTER(LSLF),
+	[PIC_MIDRANGE_OPCODE_LSRF] = IL_LIFTER(LSRF),
+	[PIC_MIDRANGE_OPCODE_ASRF] = IL_LIFTER(ASRF),
+	[PIC_MIDRANGE_OPCODE_SUBWFB] = IL_LIFTER(SUBWFB),
+	[PIC_MIDRANGE_OPCODE_ADDWFC] = IL_LIFTER(ADDWFC),
+	[PIC_MIDRANGE_OPCODE_ADDFSR] = IL_LIFTER(ADDFSR),
+	[PIC_MIDRANGE_OPCODE_MOVLP] = IL_LIFTER(MOVLP),
+	[PIC_MIDRANGE_OPCODE_BRA] = IL_LIFTER(BRA),
+	[PIC_MIDRANGE_OPCODE_MOVIW_2] = IL_LIFTER(MOVIW_2),
+	[PIC_MIDRANGE_OPCODE_MOVWI_2] = IL_LIFTER(MOVWI_2),
+	[PIC_MIDRANGE_OPCODE_INVALID] = NULL
+};
 
 /**
  * Create new Mid-Range device CPU state.
@@ -448,24 +452,22 @@ RZ_IPI RZ_OWN PicMidrangeCPUState *rz_pic_midrange_new_cpu_state(PicMidrangeDevi
 	cpu_state->selected_page = 0; // initially page is 0
 }
 
-RZ_IPI RzILOpEffect *rz_midrange_il_op(RZ_NONNULL RzAnalysis *analysis, RZ_NONNULL RZ_BORROW RzAnalysisOp *op, RZ_NONNULL RZ_BORROW PicMidrangeCPUState *cpu_state, ut16 instr) {
+RZ_IPI RzILOpEffect *rz_midrange_il_op(
+	RZ_NONNULL RzAnalysis *analysis, RZ_NONNULL RZ_BORROW RzAnalysisOp *op, RZ_NONNULL RZ_BORROW PicMidrangeCPUState *cpu_state, ut16 instr) {
 	// get opcode
 	PicMidrangeOpcode opcode = pic_midrange_get_opcode(instr);
 	if (opcode == PIC_MIDRANGE_OPCODE_INVALID) {
 		return NULL;
 	}
+	//
+	//	PicMidrangeOpArgs opargs = pic_midrange_get_opargs(instr);
 
-	// get opargs
-	PicMidrangeOpArgs opargs = pic_midrange_get_opargs(instr);
-
-	// uplift
-	PicILUplifter uplifter = pic_midrange_il_uplifters[opcode];
-	if (uplifter) {
-		return uplifter(opargs, instr);
+	FN_PicILUplifter uplifter = pic_midrange_il_uplifters[opcode];
+	if (!uplifter) {
+		return NULL;
 	}
 
-	// return NULL on failure
-	return NULL;
+	return uplifter(cpu_state, instr);
 }
 
 /**
