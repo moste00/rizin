@@ -9,15 +9,6 @@
 #include "../../asm/arch/pic/pic_midrange.h"
 #include "../arch/pic/pic_il.h"
 
-typedef struct _pic_midrange_op_args_val {
-	ut16 f;
-	ut16 k;
-	ut8 d;
-	ut8 m;
-	ut8 n;
-	ut8 b;
-} PicMidrangeOpArgsVal;
-
 typedef void (*pic_midrange_inst_handler_t)(RzAnalysis *analysis, RzAnalysisOp *op,
 	ut64 addr,
 	PicMidrangeOpArgsVal *args);
@@ -726,9 +717,13 @@ static int analysis_pic_midrange_op(RzAnalysis *analysis, RzAnalysisOp *op, ut64
 			info->handler(analysis, op, addr, &args_val);
 		}
 		if (mask & RZ_ANALYSIS_OP_MASK_IL) {
-			PicMidrangeCPUState state = { 0 };
-			rz_pic_midrange_cpu_state_setup(&state, PIC16F886);
-			info->il_handler(&state, opcode);
+			PicMidrangeILContext il_ctx = {
+				.analysis = analysis,
+				.op = op,
+				.args = args_val,
+			};
+			rz_pic_midrange_cpu_state_setup(&il_ctx.cpu, PIC16F886);
+			info->il_handler(&il_ctx, opcode);
 		}
 	}
 

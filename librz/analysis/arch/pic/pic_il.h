@@ -7,7 +7,6 @@
 #include <rz_analysis.h>
 #include <rz_il.h>
 
-
 /**
  * PIC Mid-Range Device Type.
  * Since each device has it's own set of supported instructions
@@ -39,7 +38,23 @@ typedef struct pic_midrange_cpu_state_t {
 	ut8 selected_page; ///< for instruction indexing.
 } PicMidrangeCPUState;
 
-typedef RzILOpEffect *(*pic_midrange_il_handler)(PicMidrangeCPUState *, ut16);
+typedef struct _pic_midrange_op_args_val {
+	ut16 f;
+	ut16 k;
+	ut8 d;
+	ut8 m;
+	ut8 n;
+	ut8 b;
+} PicMidrangeOpArgsVal;
+
+typedef struct pic_midrange_il_context_t {
+	RzAnalysis *analysis;
+	RzAnalysisOp *op;
+	PicMidrangeCPUState cpu;
+	PicMidrangeOpArgsVal args;
+} PicMidrangeILContext;
+
+typedef RzILOpEffect *(*pic_midrange_il_handler)(PicMidrangeILContext *, ut16);
 
 RZ_IPI bool rz_pic_midrange_cpu_state_setup(
 	PicMidrangeCPUState *state,

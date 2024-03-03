@@ -13,32 +13,28 @@
 
 #define IL_LIFTER(op)      pic_midrange_##op##_il_lifter
 #define IL_LIFTER_IMPL(op) static RzILOpEffect *pic_midrange_##op##_il_lifter( \
-	RZ_NONNULL PicMidrangeCPUState *cpu_state, ut16 instr)
+	RZ_NONNULL PicMidrangeILContext *cpu_state, ut16 instr)
 
 // REGISTER DECLARATIONS & DEFINITIONS
 #include "pic16f_memmaps/memmaps.h"
-#define GET_REG_NAME(reg_type) pic_midrange_regname(reg_type)
-#define GET_WREG()             VARG("wreg")
-#define GET_FREG(idx)          VARG("freg" #idx)
+#define REG_NAME(reg_type) pic_midrange_regname(reg_type)
+#define WREG()             "wreg"
+#define FREG(idx)          "freg" #idx
+#define SPREG(name, bank)  name
+#define VWREG()            VARG("wreg")
+#define VFREG(idx)         VARG("freg" #idx)
 // idx is kept with name in order to differentiate between same registers of different banks
-#define GET_SPREG(name, bank) VARG(name)
-#define BANK_SIZE             ((ut32)0x80)
-#define BANK_COMMON_MAP_LOW   cpu_state->selected_bank *BANK_SIZE + 0X70
-#define BANK_COMMON_MAP_HIGH  cpu_state->selected_bank *BANK_SIZE + 0X7F
+#define VSPREG(name, bank) VARG(SPREG(name, bank))
+
+#define BANK_SIZE            ((ut32)0x80)
+#define BANK_COMMON_MAP_LOW  cpu_state->selected_bank *BANK_SIZE + 0X70
+#define BANK_COMMON_MAP_HIGH cpu_state->selected_bank *BANK_SIZE + 0X7F
 
 // fields inside status register
 const char *pic_midrange_status_flags[] = {
 	"IRP", "RP1", "RP0", "TO", "PD", "Z", "DC", "C"
 };
 
-#define IRP       7
-#define RP1       6
-#define RP0       5
-#define TO        4
-#define PD        3
-#define Z         2
-#define DC        1
-#define C         0
 #define STATUS(x) pic_midrange_status_flags[x]
 
 // device to register schema map
@@ -49,83 +45,6 @@ PicMidrangeRegType *pic_midrange_device_reg_map[] = {
 	[PIC16F886] = pic16f886_reg_map,
 	//	[PIC16F887] = pic16f887_reg_map,
 };
-
-/**
- * Get PicMidrangeRegType corresponding to give register index
- *
- * \param cpu_state Device CPU state.
- * \param reg Register index inside given bank of given device type.
- *
- * \return PicMidrangeRegType
- * */
-PicMidrangeRegType pic_midrange_il_get_reg_type(RZ_NONNULL PicMidrangeCPUState *cpu_state, ut8 reg) {
-	rz_return_val_if_fail(cpu_state, REG_INVALID);
-
-	// compute linear register address
-	ut32 addr = cpu_state->selected_bank * BANK_SIZE + reg;
-	return pic_midrange_device_reg_map[cpu_state->device_type][addr];
-}
-
-/**
- * Get RzILOpPure corresponding to given register index of given device type.
- *
- * \param cpu_state Device CPU state.
- * \paramm regidx Register index in given memory bank of given device type.
- *
- * \return valid RzILOpPure on success, NULL otherwise.
- * */
-RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, ut8 regidx) {
-	rz_return_val_if_fail(cpu_state, NULL);
-
-	// compute linear address
-	ut32 addr = cpu_state->selected_bank * BANK_SIZE + regidx;
-	PicMidrangeRegType reg_type = pic_midrange_device_reg_map[cpu_state->device_type][addr];
-
-	// return register for given type
-	if (reg_type == REG_FREG) {
-		// last 16 registers in higher banks are mapped to bank 0
-		if (addr >= BANK_COMMON_MAP_LOW && addr <= BANK_COMMON_MAP_HIGH) {
-			addr = regidx;
-		}
-		return GET_FREG(addr);
-	} else if (reg_type == REG_UNIMPLEMENTED || reg_type == REG_RESERVED) {
-		return GET_SPREG(GET_REG_NAME(reg_type), cpu_state->selected_bank);
-	} else {
-		// for other special registers we need to append their bank index at the end
-		// in order to avoid confusions
-		// IDK any better way to do this atm.
-		// allocating 4 extra bytes at the end to make sure devices with 128 and more
-		// # of banks will also be supported.
-		size_t regnamesz = strlen(GET_REG_NAME(reg_type)) + 4;
-		const char *regname = malloc(regnamesz);
-		memset(regname, 0, regnamesz);
-		strcpy(regname, GET_REG_NAME(reg_type));
-		char *bankstr = rz_num_as_string(NULL, cpu_state->selected_bank, true);
-		if (!bankstr) {
-			RZ_LOG_ERROR("RzIL : FAILED TO CONVERT NUMBER TO STRING");
-			return NULL;
-		}
-		strcat(regname, bankstr);
-		free(bankstr);
-	}
-}
-
-// use only in IL_LIFTER_IMPL functions
-#define GET_REG_TYPE(idx) pic_midrange_il_get_reg_type(cpu_state, idx)
-#define GET_REG(idx)      pic_midrange_il_get_reg(cpu_state, idx);
-
-#define GET_REG_7F(varname) \
-	RzILOpPure *varname = NULL; \
-	do { \
-		ut8 regidx = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr); \
-		ut8 addr = cpu_state->selected_bank * BANK_SIZE + regidx; \
-		PicMidrangeRegType reg_type = GET_REG_TYPE(addr); \
-		if (reg_type == REG_UNIMPLEMENTED || reg_type == REG_RESERVED) { \
-			freg = U8(0); \
-		} else { \
-			freg = GET_REG(regidx); \
-		} \
-	} while (0)
 
 #define BITN(x, n) IS_ZERO(LOGAND(SHIFTR0(x, U32(n)), U32(1)))
 // overflow is not used in status register but just keeping this for future "maybe" use
@@ -150,24 +69,25 @@ RzILOpPure *pic_midrange_il_get_reg(RZ_NONNULL PicMidrangeCPUState *cpu_state, u
  *
  * \return \c RzILOpEffect containing set of steps to set status flags.
  * */
-RzILOpEffect *pic_midrange_il_set_arithmetic_flags(RZ_BORROW RzILOpPure *x, RZ_BORROW RzILOpPure *y, RZ_BORROW RzILOpPure *res, bool add) {
-	// get carry flag
-	RzILOpBool *cf = NULL;
-	RzILOpBool *dcf = NULL;
-	if (add) {
-		cf = CHECK_CARRY(x, y, res);
-		dcf = CHECK_DIGIT_CARRY(x, y, res);
-	} else { // sub
-		cf = CHECK_BORROW(x, y, res);
-		dcf = CHECK_DIGIT_BORROW(x, y, res);
-	}
-
-	// get zero flag
-	RzILOpBool *zf = IS_ZERO(res);
-
-	return SEQ3(SETG(STATUS(C), cf),
-		SETG(STATUS(DC), dcf),
-		SETG(STATUS(Z), zf));
+RzILOpEffect *pic_midrange_il_set_arithmetic_flags(
+	RZ_BORROW RzILOpPure *x, RZ_BORROW RzILOpPure *y, RZ_BORROW RzILOpPure *res, bool add) {
+//	// get carry flag
+//	RzILOpBool *cf = NULL;
+//	RzILOpBool *dcf = NULL;
+//	if (add) {
+//		cf = CHECK_CARRY(x, y, res);
+//		dcf = CHECK_DIGIT_CARRY(x, y, res);
+//	} else { // sub
+//		cf = CHECK_BORROW(x, y, res);
+//		dcf = CHECK_DIGIT_BORROW(x, y, res);
+//	}
+//
+//	// get zero flag
+//	RzILOpBool *zf = IS_ZERO(res);
+//
+//	return SEQ3(SETG(STATUS(C), cf),
+//		SETG(STATUS(DC), dcf),
+//		SETG(STATUS(Z), zf));
 }
 
 #define SET_STATUS_ADD(x, y, r) pic_midrange_il_set_arithmetic_flags(x, y, r, true)
@@ -199,19 +119,6 @@ IL_LIFTER_IMPL(CLR) {}
  * Status affected : C, DC, Z
  * */
 IL_LIFTER_IMPL(SUBWF) {
-	GET_REG_7F(freg);
-	RzILOpPure *wreg = GET_WREG();
-
-	// if d bit is enabled then result will go in freg else wreg
-	// TODO:
-	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
-	RzILOpPure *dest = reg_dest ? freg : wreg;
-
-	// create a copy of current value of wreg because it's going to change
-	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *sub_op = SETG(dest, SUB(wreg, freg));
-	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), freg, wreg);
-	return SEQ3(wreg_old, sub_op, set_status_op);
 }
 
 IL_LIFTER_IMPL(DECF) {}
@@ -224,17 +131,6 @@ IL_LIFTER_IMPL(IORWF) {}
  * Status affected : Z
  * */
 IL_LIFTER_IMPL(ANDWF) {
-	GET_REG_7F(freg);
-
-	// if d bit is enabled then result will go in freg else wreg
-	// TODO:
-	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
-	RzILOpPure *dest = reg_dest ? freg : GET_WREG();
-
-	// create a copy of current value of wreg because it's going to change
-	RzILOpEffect *and_op = SETG(dest, LOGAND(GET_WREG(), freg));
-	RzILOpEffect *set_status_op = IS_ZERO(GET_WREG());
-	return SEQ2(and_op, set_status_op);
 }
 
 /**
@@ -244,18 +140,6 @@ IL_LIFTER_IMPL(ANDWF) {
  * Status affected : Z
  * */
 IL_LIFTER_IMPL(XORWF) {
-	GET_REG_7F(freg);
-	RzILOpPure *wreg = GET_WREG();
-
-	// if d bit is enabled then result will go in freg else wreg
-	// TODO:
-	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
-	RzILOpPure *dest = reg_dest ? freg : wreg;
-
-	// create a copy of current value of wreg because it's going to change
-	RzILOpEffect *and_op = SETG(dest, LOGAND(wreg, freg));
-	RzILOpEffect *set_status_op = IS_ZERO(wreg);
-	return SEQ2(and_op, set_status_op);
 }
 
 /**
@@ -265,19 +149,6 @@ IL_LIFTER_IMPL(XORWF) {
  * Status affected : C, DC, Z
  * */
 IL_LIFTER_IMPL(ADDWF) {
-	GET_REG_7F(freg);
-	RzILOpPure *wreg = GET_WREG();
-
-	// if d bit is enabled then result will go in freg else wreg
-	// TODO:
-	bool reg_dest = PIC_MIDRANGE_OP_ARGS_7F_GET_F(instr);
-	RzILOpPure *dest = reg_dest ? freg : wreg;
-
-	// create a copy of current value of wreg because it's going to change
-	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *add_op = SETG(dest, ADD(wreg, freg));
-	RzILOpEffect *set_status_op = SET_STATUS_ADD(VARL("wreg_old"), freg, wreg);
-	return SEQ3(wreg_old, add_op, set_status_op);
 }
 
 IL_LIFTER_IMPL(MOVF) {}
@@ -304,11 +175,7 @@ static RzILOpEffect *SET(const char *flag, RzILOpBool *pPure) {
 }
 
 IL_LIFTER_IMPL(ANDLW) {
-	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *and_op = SETG("wreg", LOGAND(wreg, U8(literal)));
-	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
-	return SEQ2(and_op, set_status_op);
+
 }
 
 /**
@@ -318,11 +185,6 @@ IL_LIFTER_IMPL(ANDLW) {
  * Status affected : Z
  * */
 IL_LIFTER_IMPL(XORLW) {
-	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *xor_op = SETG("wreg", LOGXOR(wreg, U8(literal)));
-	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
-	return SEQ2(xor_op, set_status_op);
 }
 
 /**
@@ -333,7 +195,7 @@ IL_LIFTER_IMPL(XORLW) {
  * */
 IL_LIFTER_IMPL(SUBLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = GET_WREG();
+	RzILOpPure *wreg = VWREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
 	RzILOpEffect *sub_op = SETG("wreg", SUB(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), U8(literal), wreg);
@@ -348,7 +210,7 @@ IL_LIFTER_IMPL(SUBLW) {
  * */
 IL_LIFTER_IMPL(ADDLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = GET_WREG();
+	RzILOpPure *wreg = VWREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
 	RzILOpEffect *add_op = SETG("wreg", ADD(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_ADD(VARL("wreg_old"), U8(literal), wreg);
