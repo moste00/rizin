@@ -167,7 +167,6 @@ rz_analysis_sources = [
   'arch/ppc/ppc_il.c',
   'arch/ppc/ppc_il_ops.c',
   'arch/ppc/ppc_il_flag_ops.c',
-  'arch/pic/pic_midrange_il.c',
   'arch/sh/sh_il.c',
   'arch/x86/common.c',
   'arch/x86/x86_il.c',

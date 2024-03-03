@@ -3,7 +3,7 @@
 
 #include "pic_midrange.h"
 
-static const PicMidrangeOpInfo
+static const PicMidrangeOpAsmInfo
 	pic_midrange_op_info[PIC_MIDRANGE_OPCODE_INVALID] = {
 		{ "nop", PIC_MIDRANGE_OP_ARGS_NONE },
 		{ "return", PIC_MIDRANGE_OP_ARGS_NONE },
@@ -172,7 +172,7 @@ PicMidrangeOpArgs pic_midrange_get_opargs(PicMidrangeOpcode opcode) {
  * \param opcode
  * \return \c PicMidrangeOpInfo pointer.
  * */
-const PicMidrangeOpInfo *pic_midrange_get_op_info(PicMidrangeOpcode opcode) {
+const PicMidrangeOpAsmInfo *pic_midrange_get_op_info(PicMidrangeOpcode opcode) {
 	if (opcode >= PIC_MIDRANGE_OPCODE_INVALID) {
 		return NULL;
 	}
@@ -209,7 +209,7 @@ int pic_midrange_disassemble(RzAsmOp *op, const ut8 *b, int l) {
 		EMIT_INVALID
 	}
 
-	const PicMidrangeOpInfo *op_info = pic_midrange_get_op_info(opcode);
+	const PicMidrangeOpAsmInfo *op_info = pic_midrange_get_op_info(opcode);
 	if (!op_info) {
 		EMIT_INVALID
 	}

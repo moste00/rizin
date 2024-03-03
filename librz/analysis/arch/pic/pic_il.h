@@ -7,6 +7,7 @@
 #include <rz_analysis.h>
 #include <rz_il.h>
 
+
 /**
  * PIC Mid-Range Device Type.
  * Since each device has it's own set of supported instructions
@@ -38,17 +39,19 @@ typedef struct pic_midrange_cpu_state_t {
 	ut8 selected_page; ///< for instruction indexing.
 } PicMidrangeCPUState;
 
-RZ_IPI RZ_OWN PicMidrangeCPUState *rz_pic_midrange_new_cpu_state(PicMidrangeDeviceType device_type);
+typedef RzILOpEffect *(*pic_midrange_il_handler)(PicMidrangeCPUState *, ut16);
+
+RZ_IPI bool rz_pic_midrange_cpu_state_setup(
+	PicMidrangeCPUState *state,
+	PicMidrangeDeviceType device_type);
 RZ_IPI RzAnalysisILConfig *rz_midrange_il_vm_config(RZ_NONNULL RzAnalysis *analysis, PicMidrangeDeviceType device_type);
-RZ_IPI RzILOpEffect *rz_midrange_il_op(RZ_NONNULL RzAnalysis *analysis,
-	RZ_NONNULL RZ_BORROW RzAnalysisOp *op,
-	RZ_NONNULL PicMidrangeCPUState *cpu_state,
-	ut16 instr);
 
 // baseline
 /* RZ_IPI RzAnalysisILConfig *rz_pic_baseline_il_vm_config(RZ_NONNULL RzAnalysis *analysis); */
 /* RZ_IPI RzILOpEffect *rz_pic_baseline_il_op(RZ_NONNULL RzAnalysis *analysis, RZ_NONNULL RZ_BORROW RzAnalysisOp *op, ut16 instr ; */
 
 // TODO: Add support for PIC18F & other device families
+
+#include "pic_midrange_il.c"
 
 #endif // PIC_IL_H_

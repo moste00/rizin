@@ -55,7 +55,7 @@ typedef enum {
 typedef struct _pic_midrange_op {
 	const char *mnemonic;
 	PicMidrangeOpArgs args;
-} PicMidrangeOpInfo;
+} PicMidrangeOpAsmInfo;
 
 typedef enum {
 	PIC_MIDRANGE_OPCODE_NOP = 0,
@@ -115,7 +115,7 @@ typedef enum {
 
 PicMidrangeOpcode pic_midrange_get_opcode(ut16 instr);
 PicMidrangeOpArgs pic_midrange_get_opargs(PicMidrangeOpcode opcode);
-const PicMidrangeOpInfo *pic_midrange_get_op_info(PicMidrangeOpcode opcode);
+const PicMidrangeOpAsmInfo *pic_midrange_get_op_info(PicMidrangeOpcode opcode);
 int pic_midrange_disassemble(RzAsmOp *op, const ut8 *b, int l);
 
 #endif // PIC_MIDRANGE_H

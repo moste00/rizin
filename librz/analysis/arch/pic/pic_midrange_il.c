@@ -11,7 +11,6 @@
 
 // HELPER DEFINES & TYPEDEFS
 
-typedef RzILOpEffect *(*FN_PicILUplifter)(PicMidrangeCPUState *, ut16);
 #define IL_LIFTER(op)      pic_midrange_##op##_il_lifter
 #define IL_LIFTER_IMPL(op) static RzILOpEffect *pic_midrange_##op##_il_lifter( \
 	RZ_NONNULL PicMidrangeCPUState *cpu_state, ut16 instr)
@@ -373,101 +372,23 @@ IL_LIFTER_IMPL(BRA) {}
 IL_LIFTER_IMPL(MOVIW_2) {}
 IL_LIFTER_IMPL(MOVWI_2) {}
 
-// INSTRUCTIONS LOOKUP-TABLE
-static const FN_PicILUplifter pic_midrange_il_uplifters[] = {
-	[PIC_MIDRANGE_OPCODE_NOP] = IL_LIFTER(NOP),
-	[PIC_MIDRANGE_OPCODE_RETURN] = IL_LIFTER(RETURN),
-	[PIC_MIDRANGE_OPCODE_RETFIE] = IL_LIFTER(RETFIE),
-	[PIC_MIDRANGE_OPCODE_OPTION] = IL_LIFTER(OPTION),
-	[PIC_MIDRANGE_OPCODE_SLEEP] = IL_LIFTER(SLEEP),
-	[PIC_MIDRANGE_OPCODE_CLRWDT] = IL_LIFTER(CLRWDT),
-	[PIC_MIDRANGE_OPCODE_TRIS] = IL_LIFTER(TRIS),
-	[PIC_MIDRANGE_OPCODE_MOVWF] = IL_LIFTER(MOVWF),
-	[PIC_MIDRANGE_OPCODE_CLR] = IL_LIFTER(CLR),
-	[PIC_MIDRANGE_OPCODE_SUBWF] = IL_LIFTER(SUBWF),
-	[PIC_MIDRANGE_OPCODE_DECF] = IL_LIFTER(DECF),
-	[PIC_MIDRANGE_OPCODE_IORWF] = IL_LIFTER(IORWF),
-	[PIC_MIDRANGE_OPCODE_ANDWF] = IL_LIFTER(ANDWF),
-	[PIC_MIDRANGE_OPCODE_XORWF] = IL_LIFTER(XORWF),
-	[PIC_MIDRANGE_OPCODE_ADDWF] = IL_LIFTER(ADDWF),
-	[PIC_MIDRANGE_OPCODE_MOVF] = IL_LIFTER(MOVF),
-	[PIC_MIDRANGE_OPCODE_COMF] = IL_LIFTER(COMF),
-	[PIC_MIDRANGE_OPCODE_INCF] = IL_LIFTER(INCF),
-	[PIC_MIDRANGE_OPCODE_DECFSZ] = IL_LIFTER(DECFSZ),
-	[PIC_MIDRANGE_OPCODE_RRF] = IL_LIFTER(RRF),
-	[PIC_MIDRANGE_OPCODE_RLF] = IL_LIFTER(RLF),
-	[PIC_MIDRANGE_OPCODE_SWAPF] = IL_LIFTER(SWAPF),
-	[PIC_MIDRANGE_OPCODE_INCFSZ] = IL_LIFTER(INCFSZ),
-	[PIC_MIDRANGE_OPCODE_BCF] = IL_LIFTER(BCF),
-	[PIC_MIDRANGE_OPCODE_BSF] = IL_LIFTER(BSF),
-	[PIC_MIDRANGE_OPCODE_BTFSC] = IL_LIFTER(BTFSC),
-	[PIC_MIDRANGE_OPCODE_BTFSS] = IL_LIFTER(BTFSS),
-	[PIC_MIDRANGE_OPCODE_CALL] = IL_LIFTER(CALL),
-	[PIC_MIDRANGE_OPCODE_GOTO] = IL_LIFTER(GOTO),
-	[PIC_MIDRANGE_OPCODE_MOVLW] = IL_LIFTER(MOVLW),
-	[PIC_MIDRANGE_OPCODE_RETLW] = IL_LIFTER(RETLW),
-	[PIC_MIDRANGE_OPCODE_IORLW] = IL_LIFTER(IORLW),
-	[PIC_MIDRANGE_OPCODE_ANDLW] = IL_LIFTER(ANDLW),
-	[PIC_MIDRANGE_OPCODE_XORLW] = IL_LIFTER(XORLW),
-	[PIC_MIDRANGE_OPCODE_SUBLW] = IL_LIFTER(SUBLW),
-	[PIC_MIDRANGE_OPCODE_ADDLW] = IL_LIFTER(ADDLW),
-	[PIC_MIDRANGE_OPCODE_RESET] = IL_LIFTER(RESET),
-	[PIC_MIDRANGE_OPCODE_CALLW] = IL_LIFTER(CALLW),
-	[PIC_MIDRANGE_OPCODE_BRW] = IL_LIFTER(BRW),
-	[PIC_MIDRANGE_OPCODE_MOVIW_1] = IL_LIFTER(MOVIW_1),
-	[PIC_MIDRANGE_OPCODE_MOVWI_1] = IL_LIFTER(MOVWI_1),
-	[PIC_MIDRANGE_OPCODE_MOVLB] = IL_LIFTER(MOVLB),
-	[PIC_MIDRANGE_OPCODE_LSLF] = IL_LIFTER(LSLF),
-	[PIC_MIDRANGE_OPCODE_LSRF] = IL_LIFTER(LSRF),
-	[PIC_MIDRANGE_OPCODE_ASRF] = IL_LIFTER(ASRF),
-	[PIC_MIDRANGE_OPCODE_SUBWFB] = IL_LIFTER(SUBWFB),
-	[PIC_MIDRANGE_OPCODE_ADDWFC] = IL_LIFTER(ADDWFC),
-	[PIC_MIDRANGE_OPCODE_ADDFSR] = IL_LIFTER(ADDFSR),
-	[PIC_MIDRANGE_OPCODE_MOVLP] = IL_LIFTER(MOVLP),
-	[PIC_MIDRANGE_OPCODE_BRA] = IL_LIFTER(BRA),
-	[PIC_MIDRANGE_OPCODE_MOVIW_2] = IL_LIFTER(MOVIW_2),
-	[PIC_MIDRANGE_OPCODE_MOVWI_2] = IL_LIFTER(MOVWI_2),
-	[PIC_MIDRANGE_OPCODE_INVALID] = NULL
-};
-
 /**
  * Create new Mid-Range device CPU state.
  *
- * \param device_type Device to to initialize CPU state for.
- *
- * \return Valid ptr to PicMidrangeCPUState on success, NULL otherwise.
  * */
-RZ_IPI RZ_OWN PicMidrangeCPUState *rz_pic_midrange_new_cpu_state(PicMidrangeDeviceType device_type) {
+RZ_IPI bool rz_pic_midrange_cpu_state_setup(
+	PicMidrangeCPUState *state,
+	PicMidrangeDeviceType device_type) {
+	rz_return_val_if_fail(state, NULL);
 	if (device_type >= PIC_MIDRANGE_SUPPORTED_DEVICE_NUM) {
 		RZ_LOG_ERROR("RzIL : Invalid PIC Mid-Range device type provided");
+		return false;
 	}
 
-	PicMidrangeCPUState *cpu_state = malloc(sizeof(PicMidrangeCPUState));
-	if (!cpu_state) {
-		return NULL;
-	}
-
-	cpu_state->device_type = device_type;
-	cpu_state->selected_bank = 0; // initially bank is 0
-	cpu_state->selected_page = 0; // initially page is 0
-}
-
-RZ_IPI RzILOpEffect *rz_midrange_il_op(
-	RZ_NONNULL RzAnalysis *analysis, RZ_NONNULL RZ_BORROW RzAnalysisOp *op, RZ_NONNULL RZ_BORROW PicMidrangeCPUState *cpu_state, ut16 instr) {
-	// get opcode
-	PicMidrangeOpcode opcode = pic_midrange_get_opcode(instr);
-	if (opcode == PIC_MIDRANGE_OPCODE_INVALID) {
-		return NULL;
-	}
-	//
-	//	PicMidrangeOpArgs opargs = pic_midrange_get_opargs(instr);
-
-	FN_PicILUplifter uplifter = pic_midrange_il_uplifters[opcode];
-	if (!uplifter) {
-		return NULL;
-	}
-
-	return uplifter(cpu_state, instr);
+	state->device_type = device_type;
+	state->selected_bank = 0; // initially bank is 0
+	state->selected_page = 0; // initially page is 0
+	return true;
 }
 
 /**
