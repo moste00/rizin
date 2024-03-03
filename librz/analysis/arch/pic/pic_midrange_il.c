@@ -19,8 +19,8 @@ typedef RzILOpEffect *(*FN_PicILUplifter)(PicMidrangeCPUState *, ut16);
 // REGISTER DECLARATIONS & DEFINITIONS
 #include "pic16f_memmaps/memmaps.h"
 #define GET_REG_NAME(reg_type) pic_midrange_regname(reg_type)
-#define GET_WREG()             VARG("WREG")
-#define GET_FREG(idx)          VARG("FREG" #idx)
+#define GET_WREG()             VARG("wreg")
+#define GET_FREG(idx)          VARG("freg" #idx)
 // idx is kept with name in order to differentiate between same registers of different banks
 #define GET_SPREG(name, bank) VARG(name)
 #define BANK_SIZE             ((ut32)0x80)
@@ -195,7 +195,7 @@ IL_LIFTER_IMPL(CLR) {}
 
 /**
  * SUBWF
- * Operation: Subtract FREG from WREG.
+ * Operation: Subtract freg from wreg.
  * Operands: f, d
  * Status affected : C, DC, Z
  * */
@@ -220,7 +220,7 @@ IL_LIFTER_IMPL(IORWF) {}
 
 /**
  * ANDWF
- * Operation: Take logical AND of FREG and WREG.
+ * Operation: Take logical AND of freg and wreg.
  * Operands: f, d
  * Status affected : Z
  * */
@@ -240,7 +240,7 @@ IL_LIFTER_IMPL(ANDWF) {
 
 /**
  * ANDWF
- * Operation: Take logical AND of FREG and WREG.
+ * Operation: Take logical AND of freg and wreg.
  * Operands: f, d
  * Status affected : Z
  * */
@@ -261,7 +261,7 @@ IL_LIFTER_IMPL(XORWF) {
 
 /**
  * ADDWF
- * Operation: Add FREG to WREG.
+ * Operation: Add freg to wreg.
  * Operands: f, d
  * Status affected : C, DC, Z
  * */
@@ -307,28 +307,28 @@ static RzILOpEffect *SET(const char *flag, RzILOpBool *pPure) {
 IL_LIFTER_IMPL(ANDLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *and_op = SETG("WREG", LOGAND(wreg, U8(literal)));
+	RzILOpEffect *and_op = SETG("wreg", LOGAND(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
 	return SEQ2(and_op, set_status_op);
 }
 
 /**
  * XORLW.
- * Operation: Take logical XOR between literal and WREG
+ * Operation: Take logical XOR between literal and wreg
  * Operands: Literal (k)
  * Status affected : Z
  * */
 IL_LIFTER_IMPL(XORLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
-	RzILOpEffect *xor_op = SETG("WREG", LOGXOR(wreg, U8(literal)));
+	RzILOpEffect *xor_op = SETG("wreg", LOGXOR(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET(STATUS(Z), IS_ZERO(wreg));
 	return SEQ2(xor_op, set_status_op);
 }
 
 /**
  * SUBLW.
- * Operation: Subtract Literal From WREG
+ * Operation: Subtract Literal From wreg
  * Operands: Literal (k)
  * Status affected : C, DC, Z
  * */
@@ -336,14 +336,14 @@ IL_LIFTER_IMPL(SUBLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *sub_op = SETG("WREG", SUB(wreg, U8(literal)));
+	RzILOpEffect *sub_op = SETG("wreg", SUB(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), U8(literal), wreg);
 	return SEQ3(wreg_old, sub_op, set_status_op);
 }
 
 /**
  * ADDLW.
- * Operation: Add Literal To WREG
+ * Operation: Add Literal To wreg
  * Operands: Literal (k)
  * Status affected : C, DC, Z
  * */
@@ -351,7 +351,7 @@ IL_LIFTER_IMPL(ADDLW) {
 	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
 	RzILOpPure *wreg = GET_WREG();
 	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *add_op = SETG("WREG", ADD(wreg, U8(literal)));
+	RzILOpEffect *add_op = SETG("wreg", ADD(wreg, U8(literal)));
 	RzILOpEffect *set_status_op = SET_STATUS_ADD(VARL("wreg_old"), U8(literal), wreg);
 	return SEQ3(wreg_old, add_op, set_status_op);
 }
