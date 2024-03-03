@@ -113,6 +113,8 @@ typedef enum {
 	PIC_MIDRANGE_OPCODE_INVALID
 } PicMidrangeOpcode;
 
+
+
 PicMidrangeOpcode pic_midrange_get_opcode(ut16 instr);
 PicMidrangeOpArgs pic_midrange_get_opargs(PicMidrangeOpcode opcode);
 const PicMidrangeOpAsmInfo *pic_midrange_get_op_info(PicMidrangeOpcode opcode);

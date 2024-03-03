@@ -13,18 +13,10 @@
 
 #define IL_LIFTER(op)      pic_midrange_##op##_il_lifter
 #define IL_LIFTER_IMPL(op) static RzILOpEffect *pic_midrange_##op##_il_lifter( \
-	RZ_NONNULL PicMidrangeILContext *cpu_state, ut16 instr)
+	RZ_NONNULL PicMidrangeILContext *ctx, ut16 instr)
 
 // REGISTER DECLARATIONS & DEFINITIONS
 #include "pic16f_memmaps/memmaps.h"
-#define REG_NAME(reg_type) pic_midrange_regname(reg_type)
-#define WREG()             "wreg"
-#define FREG(idx)          "freg" #idx
-#define SPREG(name, bank)  name
-#define VWREG()            VARG("wreg")
-#define VFREG(idx)         VARG("freg" #idx)
-// idx is kept with name in order to differentiate between same registers of different banks
-#define VSPREG(name, bank) VARG(SPREG(name, bank))
 
 #define BANK_SIZE            ((ut32)0x80)
 #define BANK_COMMON_MAP_LOW  cpu_state->selected_bank *BANK_SIZE + 0X70
@@ -36,6 +28,12 @@ const char *pic_midrange_status_flags[] = {
 };
 
 #define STATUS(x) pic_midrange_status_flags[x]
+#define K         (ctx->args.k)
+#define D         (ctx->args.d)
+#define F         (ctx->args.f)
+#define B         (ctx->args.b)
+#define W         "w"
+#define WF_sel    (D ? pic_midrange_regname(F) : "w")
 
 // device to register schema map
 PicMidrangeRegType *pic_midrange_device_reg_map[] = {
@@ -71,23 +69,23 @@ PicMidrangeRegType *pic_midrange_device_reg_map[] = {
  * */
 RzILOpEffect *pic_midrange_il_set_arithmetic_flags(
 	RZ_BORROW RzILOpPure *x, RZ_BORROW RzILOpPure *y, RZ_BORROW RzILOpPure *res, bool add) {
-//	// get carry flag
-//	RzILOpBool *cf = NULL;
-//	RzILOpBool *dcf = NULL;
-//	if (add) {
-//		cf = CHECK_CARRY(x, y, res);
-//		dcf = CHECK_DIGIT_CARRY(x, y, res);
-//	} else { // sub
-//		cf = CHECK_BORROW(x, y, res);
-//		dcf = CHECK_DIGIT_BORROW(x, y, res);
-//	}
-//
-//	// get zero flag
-//	RzILOpBool *zf = IS_ZERO(res);
-//
-//	return SEQ3(SETG(STATUS(C), cf),
-//		SETG(STATUS(DC), dcf),
-//		SETG(STATUS(Z), zf));
+	//	// get carry flag
+	//	RzILOpBool *cf = NULL;
+	//	RzILOpBool *dcf = NULL;
+	//	if (add) {
+	//		cf = CHECK_CARRY(x, y, res);
+	//		dcf = CHECK_DIGIT_CARRY(x, y, res);
+	//	} else { // sub
+	//		cf = CHECK_BORROW(x, y, res);
+	//		dcf = CHECK_DIGIT_BORROW(x, y, res);
+	//	}
+	//
+	//	// get zero flag
+	//	RzILOpBool *zf = IS_ZERO(res);
+	//
+	//	return SEQ3(SETG(STATUS(C), cf),
+	//		SETG(STATUS(DC), dcf),
+	//		SETG(STATUS(Z), zf));
 }
 
 #define SET_STATUS_ADD(x, y, r) pic_midrange_il_set_arithmetic_flags(x, y, r, true)
@@ -130,25 +128,7 @@ IL_LIFTER_IMPL(IORWF) {}
  * Operands: f, d
  * Status affected : Z
  * */
-IL_LIFTER_IMPL(ANDWF) {
-}
-
-/**
- * ANDWF
- * Operation: Take logical AND of freg and wreg.
- * Operands: f, d
- * Status affected : Z
- * */
 IL_LIFTER_IMPL(XORWF) {
-}
-
-/**
- * ADDWF
- * Operation: Add freg to wreg.
- * Operands: f, d
- * Status affected : C, DC, Z
- * */
-IL_LIFTER_IMPL(ADDWF) {
 }
 
 IL_LIFTER_IMPL(MOVF) {}
@@ -159,10 +139,6 @@ IL_LIFTER_IMPL(RRF) {}
 IL_LIFTER_IMPL(RLF) {}
 IL_LIFTER_IMPL(SWAPF) {}
 IL_LIFTER_IMPL(INCFSZ) {}
-IL_LIFTER_IMPL(BCF) {}
-IL_LIFTER_IMPL(BSF) {}
-IL_LIFTER_IMPL(BTFSC) {}
-IL_LIFTER_IMPL(BTFSS) {}
 IL_LIFTER_IMPL(CALL) {}
 IL_LIFTER_IMPL(GOTO) {}
 IL_LIFTER_IMPL(MOVLW) {}
@@ -172,10 +148,6 @@ IL_LIFTER_IMPL(IORLW) {}
 
 static RzILOpEffect *SET(const char *flag, RzILOpBool *pPure) {
 	return SETG(flag, pPure);
-}
-
-IL_LIFTER_IMPL(ANDLW) {
-
 }
 
 /**
@@ -194,12 +166,9 @@ IL_LIFTER_IMPL(XORLW) {
  * Status affected : C, DC, Z
  * */
 IL_LIFTER_IMPL(SUBLW) {
-	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = VWREG();
-	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *sub_op = SETG("wreg", SUB(wreg, U8(literal)));
-	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), U8(literal), wreg);
-	return SEQ3(wreg_old, sub_op, set_status_op);
+	//	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
+	//	RzILOpEffect *set_status_op = SET_STATUS_SUB(VARL("wreg_old"), U8(literal), wreg);
+	//	return SEQ3(wreg_old, sub_op, set_status_op);
 }
 
 /**
@@ -209,13 +178,57 @@ IL_LIFTER_IMPL(SUBLW) {
  * Status affected : C, DC, Z
  * */
 IL_LIFTER_IMPL(ADDLW) {
-	ut8 literal = PIC_MIDRANGE_OP_ARGS_8K_GET_K(instr);
-	RzILOpPure *wreg = VWREG();
-	RzILOpEffect *wreg_old = SETL("wreg_old", wreg);
-	RzILOpEffect *add_op = SETG("wreg", ADD(wreg, U8(literal)));
-	RzILOpEffect *set_status_op = SET_STATUS_ADD(VARL("wreg_old"), U8(literal), wreg);
-	return SEQ3(wreg_old, add_op, set_status_op);
+	RzILOpEffect *add_op = SETG("w", ADD(VARG("w"), U16(K)));
+	RzILOpEffect *set_status_op =
+		SET_STATUS_ADD(VARL("_1"), U16(K), VARG("w"));
+	return SEQ3(SETL("_1", VARG("w")),
+		add_op,
+		set_status_op);
 }
+
+/**
+ * ADDWF
+ * Operation: Add freg to wreg.
+ * Operands: f, d
+ * Status affected : C, DC, Z
+ * */
+IL_LIFTER_IMPL(ADDWF) {
+	RzILOpEffect *add_op = SETG(WF_sel, ADD(VARG(W), U16(K)));
+	RzILOpEffect *set_status_op =
+		SET_STATUS_ADD(VARL("_1"), U16(K), VARG(WF_sel));
+	return SEQ3(SETL("_1", VARG(W)),
+		add_op,
+		set_status_op);
+}
+
+IL_LIFTER_IMPL(ANDLW) {
+	// TODO: set status Z
+	return SETG(W, LOGAND(VARG(W), U16(K)));
+}
+
+/**
+ * ANDWF
+ * Operation: Take logical AND of freg and wreg.
+ * Operands: f, d
+ * Status affected : Z
+ * */
+IL_LIFTER_IMPL(ANDWF) {
+	// TODO: set status Z
+	return SETG(WF_sel, LOGAND(VARG(W), U16(K)));
+}
+
+static RzILOpEffect *bit_set(const char *reg, ut32 b, bool x) {
+}
+
+IL_LIFTER_IMPL(BCF) {
+	return bit_set(pic_midrange_regname(F), B, 0);
+}
+
+IL_LIFTER_IMPL(BSF) {
+	return bit_set(pic_midrange_regname(F), B, 1);
+}
+IL_LIFTER_IMPL(BTFSC) {}
+IL_LIFTER_IMPL(BTFSS) {}
 
 IL_LIFTER_IMPL(RESET) {}
 IL_LIFTER_IMPL(CALLW) {}
