@@ -32,8 +32,11 @@ const char *pic_midrange_status_flags[] = {
 #define D         (ctx->args.d)
 #define F         (ctx->args.f)
 #define B         (ctx->args.b)
+#define PC        (ctx->addr)
 #define W         "w"
 #define WF_sel    (D ? pic_midrange_regname(F) : "w")
+
+#define INS_LEN 2
 
 // device to register schema map
 PicMidrangeRegType *pic_midrange_device_reg_map[] = {
@@ -43,6 +46,10 @@ PicMidrangeRegType *pic_midrange_device_reg_map[] = {
 	[PIC16F886] = pic16f886_reg_map,
 	//	[PIC16F887] = pic16f887_reg_map,
 };
+
+static RzILOpPure *SLICE(RzILOpPure *x, ut8 l, ut8 r) {
+	return LOGAND(SHIFTR0(x, U16(l)), U16(~(-1 << (r - l + 1))));
+}
 
 #define BITN(x, n) IS_ZERO(LOGAND(SHIFTR0(x, U32(n)), U32(1)))
 // overflow is not used in status register but just keeping this for future "maybe" use
@@ -105,10 +112,8 @@ IL_LIFTER_IMPL(RETURN) {}
 IL_LIFTER_IMPL(RETFIE) {}
 IL_LIFTER_IMPL(OPTION) {}
 IL_LIFTER_IMPL(SLEEP) {}
-IL_LIFTER_IMPL(CLRWDT) {}
 IL_LIFTER_IMPL(TRIS) {}
 IL_LIFTER_IMPL(MOVWF) {}
-IL_LIFTER_IMPL(CLR) {}
 
 /**
  * SUBWF
@@ -139,7 +144,6 @@ IL_LIFTER_IMPL(RRF) {}
 IL_LIFTER_IMPL(RLF) {}
 IL_LIFTER_IMPL(SWAPF) {}
 IL_LIFTER_IMPL(INCFSZ) {}
-IL_LIFTER_IMPL(CALL) {}
 IL_LIFTER_IMPL(GOTO) {}
 IL_LIFTER_IMPL(MOVLW) {}
 IL_LIFTER_IMPL(RETLW) {}
@@ -217,20 +221,66 @@ IL_LIFTER_IMPL(ANDWF) {
 	return SETG(WF_sel, LOGAND(VARG(W), U16(K)));
 }
 
-static RzILOpEffect *bit_set(const char *reg, ut32 b, bool x) {
+static RzILOpPure *bit_set(RzILOpPure *v, ut32 b, bool x) {
+	if (x) {
+		return LOGOR(v, U8(1 << b));
+	}
+	return LOGAND(v, U8(~(1 << b)));
+}
+
+static RzILOpPure *bit_get(RzILOpPure *v, ut32 b) {
+	return NON_ZERO(LOGAND(v, U8(1 << b)));
+}
+
+static RzILOpEffect *regbit_set(const char *reg, ut32 b, bool x) {
+	return SETG(reg, bit_set(VARG(reg), b, x));
 }
 
 IL_LIFTER_IMPL(BCF) {
-	return bit_set(pic_midrange_regname(F), B, 0);
+	return regbit_set(pic_midrange_regname(F), B, 0);
 }
 
 IL_LIFTER_IMPL(BSF) {
-	return bit_set(pic_midrange_regname(F), B, 1);
+	return regbit_set(pic_midrange_regname(F), B, 1);
 }
-IL_LIFTER_IMPL(BTFSC) {}
-IL_LIFTER_IMPL(BTFSS) {}
 
-IL_LIFTER_IMPL(RESET) {}
+IL_LIFTER_IMPL(BTFSC) {
+	return BRANCH(bit_get(VARG(pic_midrange_regname(F)), B), NOP(), JMP(U32(PC + INS_LEN * 2)));
+}
+
+IL_LIFTER_IMPL(BTFSS) {
+	return BRANCH(bit_get(VARG(pic_midrange_regname(F)), B), JMP(U32(PC + INS_LEN * 2)), NOP());
+}
+
+IL_LIFTER_IMPL(CALL) {
+	return SEQ2(
+		SETG("tos", ADD(U16(PC + INS_LEN))),
+		JMP(LOGOR(U16(K), SHIFTL0(SLICE(VARG("pclath"), 3, 4), U16(11)))));
+}
+
+IL_LIFTER_IMPL(CLRF) {
+	return SEQ2(
+		SETG(pic_midrange_regname(F), U16(0)),
+		SETG("z", U16(1)));
+}
+
+IL_LIFTER_IMPL(CLR) {
+	return SEQ2(
+		SETG(W, U16(0)),
+		SETG("z", U16(1)));
+}
+
+IL_LIFTER_IMPL(CLRWDT) {
+	return SEQ4(
+		SETG("wdt", U16(0)),
+		SETG("wdt_prescaler_count", U16(0)),
+		SETG("to", U16(1)),
+		SETG("pd", U16(1)));
+}
+
+IL_LIFTER_IMPL(RESET) {
+}
+
 IL_LIFTER_IMPL(CALLW) {}
 IL_LIFTER_IMPL(BRW) {}
 IL_LIFTER_IMPL(MOVIW_1) {}

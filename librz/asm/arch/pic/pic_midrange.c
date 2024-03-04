@@ -11,6 +11,8 @@ static const PicMidrangeOpAsmInfo
 		{ "option", PIC_MIDRANGE_OP_ARGS_NONE },
 		{ "sleep", PIC_MIDRANGE_OP_ARGS_NONE },
 		{ "clrwdt", PIC_MIDRANGE_OP_ARGS_NONE },
+		{ "clrf", PIC_MIDRANGE_OP_ARGS_7F },
+		{ "clrw", PIC_MIDRANGE_OP_ARGS_NONE },
 		{ "tris", PIC_MIDRANGE_OP_ARGS_2F },
 		{ "movwf", PIC_MIDRANGE_OP_ARGS_7F },
 		{ "clr", PIC_MIDRANGE_OP_ARGS_1D_7F },
@@ -118,6 +120,8 @@ PicMidrangeOpcode pic_midrange_get_opcode(ut16 instr) {
 
 	switch (instr >> 7) { // 7 first MSB bits
 	case 0x1: return PIC_MIDRANGE_OPCODE_MOVWF;
+	case 0x2: return PIC_MIDRANGE_OPCODE_CLRW;
+	case 0x3: return PIC_MIDRANGE_OPCODE_CLRF;
 	case 0x62: return PIC_MIDRANGE_OPCODE_ADDFSR;
 	case 0x63: return PIC_MIDRANGE_OPCODE_MOVLP;
 	case 0x7e: return PIC_MIDRANGE_OPCODE_MOVIW_2;

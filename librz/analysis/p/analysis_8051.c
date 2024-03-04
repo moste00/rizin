@@ -359,7 +359,7 @@ static void exi_rn(RzAnalysisOp *op, ut8 reg, const char *operation) {
 #define xw(subject)            exw_##subject(op, ev_##subject)
 #define xi(subject, operation) exi_##subject(op, ev_##subject, operation)
 
-#define bit_set ef("%d,1,<<,", buf[1] & 7)
+#define regbit_set ef("%d,1,<<,", buf[1] & 7)
 #define bit_mask \
 	bit_set; \
 	e("255,^,")

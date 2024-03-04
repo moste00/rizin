@@ -721,6 +721,7 @@ static int analysis_pic_midrange_op(RzAnalysis *analysis, RzAnalysisOp *op, ut64
 				.analysis = analysis,
 				.op = op,
 				.args = args_val,
+				.addr = addr,
 			};
 			rz_pic_midrange_cpu_state_setup(&il_ctx.cpu, PIC16F886);
 			info->il_handler(&il_ctx, opcode);

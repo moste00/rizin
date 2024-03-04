@@ -36,6 +36,7 @@ typedef struct pic_midrange_cpu_state_t {
 	PicMidrangeDeviceType device_type;
 	ut8 selected_bank; ///< for register indexing.
 	ut8 selected_page; ///< for instruction indexing.
+	bool skip;
 } PicMidrangeCPUState;
 
 typedef struct _pic_midrange_op_args_val {
@@ -52,6 +53,7 @@ typedef struct pic_midrange_il_context_t {
 	RzAnalysisOp *op;
 	PicMidrangeCPUState cpu;
 	PicMidrangeOpArgsVal args;
+	ut64 addr;
 } PicMidrangeILContext;
 
 typedef RzILOpEffect *(*pic_midrange_il_handler)(PicMidrangeILContext *, ut16);
