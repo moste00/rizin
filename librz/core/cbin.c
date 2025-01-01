@@ -1563,7 +1563,7 @@ RZ_API bool rz_core_bin_apply_symbols(RzCore *core, RzBinFile *binfile, bool va)
 				}
 
 				fi = rz_flag_set(core->flags, fnp, addr, symbol->size);
-				if (fi) {
+				if (fi && !RZ_STR_ISEMPTY(n)) {
 					rz_flag_item_set_realname(fi, n);
 					fi->demangled = (bool)(size_t)sn.demname;
 				} else if (fn) {
