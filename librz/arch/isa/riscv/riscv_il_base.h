@@ -53,14 +53,24 @@ static const char *riscv_register_names[] = {
 		return RISCV_SET_REG(rd, result); \
 	}
 
-// by default, a RISC-V jump both sets a destination and sets the PC (i.e., jumps)
-#define DEFINE_LIFTER_FOR_JUMP(name, decoder, result, jmp_effect) \
+// rd = result, then post_effect (e.g. jump: set return address, then redirect PC)
+#define DEFINE_LIFTER_WITH_POST_EFFECT(name, decoder, result, post_effect) \
 	static RzILOpEffect *rz_riscv_lift_##name(RZ_BORROW RZ_NONNULL RzAnalysis *analysis, \
 		RZ_NONNULL RzAnalysisOp *op, RZ_NONNULL cs_insn *insn, ut64 current_addr, int size) { \
 		decoder(analysis, insn); \
 		return SEQ2( \
 			RISCV_SET_REG(rd, result), \
-			jmp_effect); \
+			post_effect); \
+	}
+
+// pre_effect, then rd = result (e.g. store-conditional: store first, then write success flag)
+#define DEFINE_LIFTER_WITH_PRE_EFFECT(name, decoder, pre_effect, result) \
+	static RzILOpEffect *rz_riscv_lift_##name(RZ_BORROW RZ_NONNULL RzAnalysis *analysis, \
+		RZ_NONNULL RzAnalysisOp *op, RZ_NONNULL cs_insn *insn, ut64 current_addr, int size) { \
+		decoder(analysis, insn); \
+		return SEQ2( \
+			pre_effect, \
+			RISCV_SET_REG(rd, result)); \
 	}
 
 #define DEFINE_LIFTER_WITH_EFFECT(name, decoder, effect) \
@@ -70,8 +80,10 @@ static const char *riscv_register_names[] = {
 		return effect; \
 	}
 
+// by default, a RISC-V jump both sets a destination and sets the PC (i.e., jumps)
+#define DEFINE_LIFTER_FOR_JUMP         DEFINE_LIFTER_WITH_POST_EFFECT
 // oneway jumps are those that don't have a destination register
-#define DEFINE_LIFTER_FOR_ONEWAY_JUMP DEFINE_LIFTER_WITH_EFFECT
+#define DEFINE_LIFTER_FOR_ONEWAY_JUMP  DEFINE_LIFTER_WITH_EFFECT
 
 #define DEFINE_ALIAS_LIFTER(alias, name) static const RiscvInstructionLifter rz_riscv_lift_##alias = rz_riscv_lift_##name;
 
