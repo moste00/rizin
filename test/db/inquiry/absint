@@ -225,3 +225,985 @@ EXPECT=<<EOF
 0x80002a0   32      0      8                        0x080001e4       
 EOF
 RUN
+
+NAME=hexagon packet: jump (word 0) + 1 insn
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { jump 0x40 ; R1 = #1 }
+wx 2040005821c00078
+wx 00c09f52 @ 8
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 12   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0    8      0      2 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   jump 0x40  |
+      | \   R1 = ##0x1 |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: jump (word 1) + 1 insn
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { R1 = #1 ; jump 0x40 }
+wx 2140007820c00058
+wx 00c09f52 @ 8
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 12   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0    8      0      2 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   R1 = ##0x1 |
+      | \   jump 0x40  |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: jump (word 0) + 2 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { jump 0x40 ; R1 = #1 ; R2 = #2 }
+wx 204000582140007842c00078
+wx 00c09f52 @ 12
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 16   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   12      0      3 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   jump 0x40  |
+      | |   R1 = ##0x1 |
+      | \   R2 = ##0x2 |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: jump (word 1) + 2 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { R1 = #1 ; jump 0x40 ; R2 = #2 }
+wx 214000782040005842c00078
+wx 00c09f52 @ 12
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 16   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   12      0      3 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   R1 = ##0x1 |
+      | |   jump 0x40  |
+      | \   R2 = ##0x2 |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: jump (word 0, slot 3) + 3 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { jump 0x40 ; R1 = #1 ; R2 = #2 ; R3 = #3 }
+wx 20400058214000784240007863c00078
+wx 00c09f52 @ 16
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   jump 0x40  |
+      | |   R1 = ##0x1 |
+      | |   R2 = ##0x2 |
+      | \   R3 = ##0x3 |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: jump (word 1, slot 2) + 3 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Decoy jumpr R31 right after the packet (must not be reached), jump target jumpr R31 at 0x40.
+# { R1 = #1 ; jump 0x40 ; R2 = #2 ; R3 = #3 }
+wx 21400078204000584240007863c00078
+wx 00c09f52 @ 16
+wx 00c09f52 @ 0x40
+aIf
+afl
+ablt
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000000
+      .----------------.
+      |  0x0           |
+      | inq.0x0();     |
+      | /   R1 = ##0x1 |
+      | |   jump 0x40  |
+      | |   R2 = ##0x2 |
+      | \   R3 = ##0x3 |
+      `----------------'
+          v
+          |
+    .-----'
+    |
+.----------------------------.
+|  0x40                      |
+| ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + jump, 0 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first (conditional) taken -> 0x40, else second (unconditional) -> 0x80. Never falls through.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# { if (P0) jump 0x40 ; jump 0x80 }
+wx 2040005c40c00058
+wx 00c09f52 @ 8
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    3 132  -> 16   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0    8      0      2 0x00000040 0x00000080  0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .--------------------------.
+                  |  0x0                     |
+                  | inq.0x0();               |
+                  | /   if (P0) jump:nt 0x40 |
+                  | \   jump 0x80            |
+                  `--------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x40                      |    |  0x80                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + jump, 1 insn
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first (conditional) taken -> 0x40, else second (unconditional) -> 0x80. Never falls through.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# { if (P0) jump 0x40 ; jump 0x80 ; R1 = #1 }
+wx 2040005c4040005821c00078
+wx 00c09f52 @ 12
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    3 132  -> 20   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0   12      0      3 0x00000040 0x00000080  0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .--------------------------.
+                  |  0x0                     |
+                  | inq.0x0();               |
+                  | /   if (P0) jump:nt 0x40 |
+                  | |   jump 0x80            |
+                  | \   R1 = ##0x1           |
+                  `--------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x40                      |    |  0x80                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + jump, 2 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first (conditional) taken -> 0x40, else second (unconditional) -> 0x80. Never falls through.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# { if (P0) jump 0x40 ; jump 0x80 ; R1 = #1 ; R2 = #2 }
+wx 2040005c404000582140007842c00078
+wx 00c09f52 @ 16
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    3 132  -> 24   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040 0x00000080  0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .--------------------------.
+                  |  0x0                     |
+                  | inq.0x0();               |
+                  | /   if (P0) jump:nt 0x40 |
+                  | |   jump 0x80            |
+                  | |   R1 = ##0x1           |
+                  | \   R2 = ##0x2           |
+                  `--------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x40                      |    |  0x80                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + if (!P0) jump, 0 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first taken -> 0x40, else second taken -> 0x80. Both test bit 0 of the same P0,
+# so exactly one is always taken and the fallthrough to the packet end is infeasible.
+# The constant domain can't relate the two conditions with P0 unknown, so absint also follows
+# the infeasible fallthrough and adds the jumpr R31 after the packet as a block. RzAnalysisBlock
+# only has jump/fail, so that third edge is dropped and the block has no incoming edge.
+# A precise analysis would produce only the 0x40 and 0x80 edges and no block after the packet.
+# { if (P0) jump 0x40 ; if (!P0) jump 0x80 }
+wx 2040005c40c0205c
+wx 00c09f52 @ 8
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    4 132  -> 20   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0    8      0      2 0x00000080 0x00000040  0x00000000       
+ 0x8    4      0      1                        0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .---------------------------.   .--------------.
+                  |  0x0                      |   |  0x8         |
+                  | inq.0x0();                |   | [   jumpr LR |
+                  | /   if (P0) jump:nt 0x40  |   `--------------'
+                  | \   if (!P0) jump:nt 0x80 |
+                  `---------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x80                      |    |  0x40                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + if (!P0) jump, 1 insn
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first taken -> 0x40, else second taken -> 0x80. Both test bit 0 of the same P0,
+# so exactly one is always taken and the fallthrough to the packet end is infeasible.
+# The constant domain can't relate the two conditions with P0 unknown, so absint also follows
+# the infeasible fallthrough and adds the jumpr R31 after the packet as a block. RzAnalysisBlock
+# only has jump/fail, so that third edge is dropped and the block has no incoming edge.
+# A precise analysis would produce only the 0x40 and 0x80 edges and no block after the packet.
+# { if (P0) jump 0x40 ; if (!P0) jump 0x80 ; R1 = #1 }
+wx 2040005c4040205c21c00078
+wx 00c09f52 @ 12
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    4 132  -> 24   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0   12      0      3 0x00000080 0x00000040  0x00000000       
+ 0xc    4      0      1                        0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .---------------------------.   .--------------.
+                  |  0x0                      |   |  0xc         |
+                  | inq.0x0();                |   | [   jumpr LR |
+                  | /   if (P0) jump:nt 0x40  |   `--------------'
+                  | |   if (!P0) jump:nt 0x80 |
+                  | \   R1 = ##0x1            |
+                  `---------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x80                      |    |  0x40                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + if (!P0) jump, 2 insns
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# Dual jump: first taken -> 0x40, else second taken -> 0x80. Both test bit 0 of the same P0,
+# so exactly one is always taken and the fallthrough to the packet end is infeasible.
+# The constant domain can't relate the two conditions with P0 unknown, so absint also follows
+# the infeasible fallthrough and adds the jumpr R31 after the packet as a block. RzAnalysisBlock
+# only has jump/fail, so that third edge is dropped and the block has no incoming edge.
+# A precise analysis would produce only the 0x40 and 0x80 edges and no block after the packet.
+# { if (P0) jump 0x40 ; if (!P0) jump 0x80 ; R1 = #1 ; R2 = #2 }
+wx 2040005c4040205c2140007842c00078
+wx 00c09f52 @ 16
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    4 132  -> 28   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0   16      0      4 0x00000080 0x00000040  0x00000000       
+0x10    4      0      1                        0x00000000       
+0x40    4      0      1                        0x00000000        0x00000000
+0x80    4      0      1                        0x00000000        0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CODE -> 0x80 inq.0x0+128
+                  .---------------------------.   .--------------.
+                  |  0x0                      |   |  0x10        |
+                  | inq.0x0();                |   | [   jumpr LR |
+                  | /   if (P0) jump:nt 0x40  |   `--------------'
+                  | |   if (!P0) jump:nt 0x80 |
+                  | |   R1 = ##0x1            |
+                  | \   R2 = ##0x2            |
+                  `---------------------------'
+                        t f
+                        | |
+    .-------------------' |
+    |                     '-----------.
+    |                                 |
+.----------------------------.    .----------------------------.
+|  0x80                      |    |  0x40                      |
+| ; CODE XREF from inq.0x0 @ |    | ; CODE XREF from inq.0x0 @ |
+| [   jumpr LR               |    | [   jumpr LR               |
+`----------------------------'    `----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump if (P0) jump + call, 1 insn
+FILE==
+ARGS=-a hexagon -b 32
+BROKEN=1
+CMDS=<<EOF
+# Dual jump: first taken -> 0x40 (LR unchanged, plain jump), else call 0x80 and return to the packet end.
+# BROKEN: the lifter writes LR even if the first jump is taken, so 0x40 is classified as a call.
+# { if (P0) jump 0x40 ; call 0x80 ; R1 = #1 }
+wx 2040005c4040005a21c00078
+wx 00c09f52 @ 12
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    3 68   -> 20   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls       xrefs       
+----------------------------------------------------------------------------------
+ 0x0   12      0      3 0x00000040 0x0000000c  0x00000000  0x00000080 
+ 0xc    4      0      1                        0x00000000             
+0x40    4      0      1                        0x00000000              0x00000000
+                                 inq.0x0 0x0 ->      CODE -> 0x40 inq.0x0+64
+                                 inq.0x0 0x0 ->      CALL -> 0x80 inq.0x0+128
+              .--------------------------.
+              |  0x0                     |
+              | inq.0x0();               |
+              | /   if (P0) jump:nt 0x40 |
+              | |   call 0x80            |
+              | \   R1 = ##0x1           |
+              `--------------------------'
+                    t f
+                    | |
+    .---------------' |
+    |                 '---------------.
+    |                                 |
+.----------------------------.    .--------------.
+|  0x40                      |    |  0xc         |
+| ; CODE XREF from inq.0x0 @ |    | [   jumpr LR |
+| [   jumpr LR               |    `--------------'
+`----------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0 unknown
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# P0 is never set -> both jumps are possible.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; nop ; { if (P0) jump 0x40 ; jump 0x80 }
+wx 20c0007800c0007f1c40005c3cc00058
+wx 00c09f52 @ 0x10
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    3 132  -> 24   inq.0x0
+addr size traced ninstr jump       fail       fcns        calls xrefs       
+----------------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040 0x00000080  0x00000000       
+0x40    4      0      1                        0x00000000        0x00000008
+0x80    4      0      1                        0x00000000        0x00000008
+                               inq.0x0+8 0x8 ->      CODE -> 0x40 inq.0x0+64
+                               inq.0x0+8 0x8 ->      CODE -> 0x80 inq.0x0+128
+                      .--------------------------.
+                      |  0x0                     |
+                      | inq.0x0();               |
+                      | [   R0 = ##0x1           |
+                      | [   nop                  |
+                      | /   if (P0) jump:nt 0x40 |
+                      | \   jump 0x80            |
+                      `--------------------------'
+                            t f
+                            | |
+    .-----------------------' |
+    |                         '-----------.
+    |                                     |
+.--------------------------------.    .--------------------------------.
+|  0x40                          |    |  0x80                          |
+| ; CODE XREF from inq.0x0 @ 0x8 |    | ; CODE XREF from inq.0x0 @ 0x8 |
+| [   jumpr LR                   |    | [   jumpr LR                   |
+`--------------------------------'    `--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0 true from earlier packet
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# P0 is known true -> only the first jump (0x40) is possible, 0x80 must be pruned.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; P0 = cmp.eq(R0,#1) ; { if (P0) jump 0x40 ; jump 0x80 }
+wx 20c0007820c000751c40005c3cc00058
+wx 00c09f52 @ 0x10
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000008
+                               inq.0x0+8 0x8 ->      CODE -> 0x40 inq.0x0+64
+   .---------------------------.
+   |  0x0                      |
+   | inq.0x0();                |
+   | [   R0 = ##0x1            |
+   | [   P0 = cmp.eq(R0,##0x1) |
+   | /   if (P0) jump:nt 0x40  |
+   | \   jump 0x80             |
+   `---------------------------'
+       v
+       |
+    .--'
+    |
+.--------------------------------.
+|  0x40                          |
+| ; CODE XREF from inq.0x0 @ 0x8 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0 false from earlier packet
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# P0 is known false -> only the second jump (0x80) is possible, 0x40 must be pruned.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; P0 = cmp.eq(R0,#2) ; { if (P0) jump 0x40 ; jump 0x80 }
+wx 20c0007840c000751c40005c3cc00058
+wx 00c09f52 @ 0x10
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 132  -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000080       0x00000000       
+0x80    4      0      1                  0x00000000        0x00000008
+                               inq.0x0+8 0x8 ->      CODE -> 0x80 inq.0x0+128
+   .---------------------------.
+   |  0x0                      |
+   | inq.0x0();                |
+   | [   R0 = ##0x1            |
+   | [   P0 = cmp.eq(R0,##0x2) |
+   | /   if (P0) jump:nt 0x40  |
+   | \   jump 0x80             |
+   `---------------------------'
+       v
+       |
+    .--'
+    |
+.--------------------------------.
+|  0x80                          |
+| ; CODE XREF from inq.0x0 @ 0x8 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0.new true, compound cmp-jump
+FILE==
+ARGS=-a hexagon -b 32
+BROKEN=1
+CMDS=<<EOF
+# P0.new is true -> first jump (0x40) taken, second ignored.
+# BROKEN: hex_shuffle_insns() moves the .new jump behind the unconditional one,
+# so the unconditional jump always wins (lifter bug, same with RzIL emulation).
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; { P0 = cmp.eq(R0,#1); if (P0.new) jump 0x40 ; jump 0x80 }
+wx 20c000781e4100103ec00058
+wx 00c09f52 @ 0xc
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 16   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   12      0      3 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000004
+                               inq.0x0+4 0x4 ->      CODE -> 0x40 inq.0x0+64
+.----------------------------------------------------.
+|  0x0                                               |
+| inq.0x0();                                         |
+| [   R0 = ##0x1                                     |
+| /   P0 = cmp.eq(R0,#0x1); if (P0.new) jump:nt 0x40 |
+| \   jump 0x80                                      |
+`----------------------------------------------------'
+    v
+    |
+    '---------.
+              |
+          .--------------------------------.
+          |  0x40                          |
+          | ; CODE XREF from inq.0x0 @ 0x4 |
+          | [   jumpr LR                   |
+          `--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0.new false, compound cmp-jump
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# P0.new is false -> first jump not taken, second (0x80) taken.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; { P0 = cmp.eq(R0,#2); if (P0.new) jump 0x40 ; jump 0x80 }
+wx 20c000781e4200103ec00058
+wx 00c09f52 @ 0xc
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 132  -> 16   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   12      0      3 0x00000080       0x00000000       
+0x80    4      0      1                  0x00000000        0x00000004
+                               inq.0x0+4 0x4 ->      CODE -> 0x80 inq.0x0+128
+.----------------------------------------------------.
+|  0x0                                               |
+| inq.0x0();                                         |
+| [   R0 = ##0x1                                     |
+| /   P0 = cmp.eq(R0,#0x2); if (P0.new) jump:nt 0x40 |
+| \   jump 0x80                                      |
+`----------------------------------------------------'
+    v
+    |
+    '---------.
+              |
+          .--------------------------------.
+          |  0x80                          |
+          | ; CODE XREF from inq.0x0 @ 0x4 |
+          | [   jumpr LR                   |
+          `--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0.new true, separate cmp
+FILE==
+ARGS=-a hexagon -b 32
+BROKEN=1
+CMDS=<<EOF
+# P0.new is true -> first jump (0x40) taken, second ignored. The compare is the last word.
+# BROKEN: hex_shuffle_insns() moves the .new jump behind the unconditional one,
+# so the unconditional jump always wins (lifter bug, same with RzIL emulation).
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; { if (P0.new) jump 0x40 ; jump 0x80 ; P0 = cmp.eq(R0,#1) }
+wx 20c000781e48005c3e40005820c00075
+wx 00c09f52 @ 0x10
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000004
+                               inq.0x0+4 0x4 ->      CODE -> 0x40 inq.0x0+64
+ .------------------------------.
+ |  0x0                         |
+ | inq.0x0();                   |
+ | [   R0 = ##0x1               |
+ | /   if (P0.new) jump:nt 0x40 |
+ | |   jump 0x80                |
+ | \   P0 = cmp.eq(R0,##0x1)    |
+ `------------------------------'
+     v
+     |
+    .'
+    |
+.--------------------------------.
+|  0x40                          |
+| ; CODE XREF from inq.0x0 @ 0x4 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0.new false, separate cmp
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# P0.new is false -> first jump not taken, second (0x80) taken. The compare is the last word.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; { if (P0.new) jump 0x40 ; jump 0x80 ; P0 = cmp.eq(R0,#2) }
+wx 20c000781e48005c3e40005840c00075
+wx 00c09f52 @ 0x10
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 132  -> 20   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   16      0      4 0x00000080       0x00000000       
+0x80    4      0      1                  0x00000000        0x00000004
+                               inq.0x0+4 0x4 ->      CODE -> 0x80 inq.0x0+128
+ .------------------------------.
+ |  0x0                         |
+ | inq.0x0();                   |
+ | [   R0 = ##0x1               |
+ | /   if (P0.new) jump:nt 0x40 |
+ | |   jump 0x80                |
+ | \   P0 = cmp.eq(R0,##0x2)    |
+ `------------------------------'
+     v
+     |
+    .'
+    |
+.--------------------------------.
+|  0x80                          |
+| ; CODE XREF from inq.0x0 @ 0x4 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0 assigned in word 0, branch on old P0
+FILE==
+ARGS=-a hexagon -b 32
+CMDS=<<EOF
+# The jump reads P0 (not .new) -> it sees the old value (false) -> only 0x80.
+# Old P0 = false (set in the packet before), the packet itself sets P0 = true in its first word.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; P0 = cmp.eq(R0,#2) ; { P0 = cmp.eq(R0,#1) ; if (P0) jump 0x40 ; jump 0x80 }
+wx 20c0007840c00075204000751c40005c3cc00058
+wx 00c09f52 @ 0x14
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 132  -> 24   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   20      0      5 0x00000080       0x00000000       
+0x80    4      0      1                  0x00000000        0x00000008
+                               inq.0x0+8 0x8 ->      CODE -> 0x80 inq.0x0+128
+   .---------------------------.
+   |  0x0                      |
+   | inq.0x0();                |
+   | [   R0 = ##0x1            |
+   | [   P0 = cmp.eq(R0,##0x2) |
+   | /   P0 = cmp.eq(R0,##0x1) |
+   | |   if (P0) jump:nt 0x40  |
+   | \   jump 0x80             |
+   `---------------------------'
+       v
+       |
+    .--'
+    |
+.--------------------------------.
+|  0x80                          |
+| ; CODE XREF from inq.0x0 @ 0x8 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
+
+NAME=hexagon packet: dual jump, P0 assigned in word 0, branch on P0.new
+FILE==
+ARGS=-a hexagon -b 32
+BROKEN=1
+CMDS=<<EOF
+# The jump reads P0.new -> it sees the new value (true) -> only 0x40.
+# BROKEN: hex_shuffle_insns() moves the .new jump behind the unconditional one,
+# so the unconditional jump always wins (lifter bug, same with RzIL emulation).
+# Old P0 = false (set in the packet before), the packet itself sets P0 = true in its first word.
+# Decoy jumpr R31 right after the packet (must not be reached).
+# R0 = #1 ; P0 = cmp.eq(R0,#2) ; { P0 = cmp.eq(R0,#1) ; if (P0.new) jump 0x40 ; jump 0x80 }
+wx 20c0007840c00075204000751c48005c3cc00058
+wx 00c09f52 @ 0x14
+wx 00c09f52 @ 0x40
+wx 00c09f52 @ 0x80
+aIf
+afl
+ablt
+axl
+agf
+EOF
+EXPECT=<<EOF
+0x00000000    2 68   -> 24   inq.0x0
+addr size traced ninstr jump       fail fcns        calls xrefs       
+----------------------------------------------------------------------
+ 0x0   20      0      5 0x00000040       0x00000000       
+0x40    4      0      1                  0x00000000        0x00000008
+                               inq.0x0+8 0x8 ->      CODE -> 0x40 inq.0x0+64
+ .------------------------------.
+ |  0x0                         |
+ | inq.0x0();                   |
+ | [   R0 = ##0x1               |
+ | [   P0 = cmp.eq(R0,##0x2)    |
+ | /   P0 = cmp.eq(R0,##0x1)    |
+ | |   if (P0.new) jump:nt 0x40 |
+ | \   jump 0x80                |
+ `------------------------------'
+     v
+     |
+    .'
+    |
+.--------------------------------.
+|  0x40                          |
+| ; CODE XREF from inq.0x0 @ 0x8 |
+| [   jumpr LR                   |
+`--------------------------------'
+EOF
+RUN
